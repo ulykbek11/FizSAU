@@ -10,9 +10,6 @@ import {
   BrainCircuit,
   Zap,
   FileUp,
-  X,
-  Plus,
-  Paperclip,
   Users,
   MessageSquare,
   BarChart3
