@@ -1,25 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BrainCircuit, FileText, ChevronRight } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, FileText, ChevronRight, Trash2, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
 import type { Task } from '../components/AISimulator';
+import { UploadTaskModal } from '../components/UploadTaskModal';
 
 const TasksPage: React.FC = () => {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isTeamLeader, setIsTeamLeader] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchTasks = async () => {
+    const initData = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const leader = user?.user_metadata?.role === 'teamleader';
+        setIsTeamLeader(leader);
+
         const { data, error } = await supabase.from('tasks').select('*');
         if (error) throw error;
-        
+
         if (data) {
-          // Получаем прогресс из localStorage (можно также грузить из БД, но пока берем отсюда)
           const progress = JSON.parse(localStorage.getItem('ai_simulator_progress') || '{"solvedCount":0, "solvedTasks": []}');
-          const solvedTaskIds = progress.solvedTasks || []; // Допустим, мы будем хранить массив ID решенных задач
+          const solvedTaskIds = progress.solvedTasks || [];
 
           const formattedTasks: Task[] = data.map(t => ({
             id: t.id,
@@ -28,14 +34,11 @@ const TasksPage: React.FC = () => {
             solution: t.evaluation_criteria?.[0]?.text || '',
             author: 'Тимлидер',
             category: t.mode === 'simulation' ? 'Симуляция' : 'Код',
-            isSolved: solvedTaskIds.includes(t.id) // Флаг, решена ли задача
+            isSolved: solvedTaskIds.includes(t.id)
           }));
-          
-          // Отфильтровываем решенные задачи, если хотим чтобы они отпадали из активных
-          // Если хотим, чтобы они были видны, но отмечены галочкой, убираем фильтр
-          // По ТЗ: "решенные таски должны отпадать" -> фильтруем
-          const activeTasks = formattedTasks.filter(t => !t.isSolved);
-          setTasks(activeTasks);
+
+          const displayTasks = leader ? formattedTasks : formattedTasks.filter(t => !t.isSolved);
+          setTasks(displayTasks);
         }
       } catch (err) {
         console.error('Ошибка загрузки задач:', err);
@@ -44,14 +47,28 @@ const TasksPage: React.FC = () => {
       }
     };
 
-    fetchTasks();
+    initData();
   }, []);
+
+  const handleDeleteTask = async (e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Точно удалить задачу для всей команды?')) return;
+
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+      if (error) throw error;
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch (err) {
+      console.error('Ошибка удаления:', err);
+      alert('Ошибка при удалении');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] pt-8 pb-16">
       <div className="max-w-5xl mx-auto px-6 space-y-8">
         {/* Navigation */}
-        <button 
+        <button
           onClick={() => navigate('/dashboard')}
           className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors font-bold text-sm group w-fit"
         >
@@ -62,17 +79,34 @@ const TasksPage: React.FC = () => {
         </button>
 
         {/* Header */}
-        <header>
-          <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3 tracking-tight">
-            <div className="p-2 bg-primary/10 rounded-2xl">
-              <FileText className="text-primary w-6 h-6" />
-            </div>
-            Активные задачи
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium">
-            Список всех доступных задач от вашего тимлидера и AI-ментора.
-          </p>
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3 tracking-tight">
+              <div className="p-2 bg-primary/10 rounded-2xl">
+                <FileText className="text-primary w-6 h-6" />
+              </div>
+              {isTeamLeader ? 'Управление задачами' : 'Активные задачи'}
+            </h1>
+            <p className="text-slate-500 mt-2 font-medium">
+              {isTeamLeader ? 'Создавайте и отзывайте задачи для команды.' : 'Список всех доступных задач от вашего тимлидера и AI-ментора.'}
+            </p>
+          </div>
+          {isTeamLeader && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="px-6 py-3 bg-primary text-white rounded-2xl font-black text-sm shadow-xl shadow-primary/20 transition-all hover:translate-y-[-2px] active:translate-y-0 flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Добавить задачу
+            </button>
+          )}
         </header>
+
+        <UploadTaskModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          onTaskSaved={() => window.location.reload()}
+        />
 
         {loading ? (
           <div className="text-center py-20">
@@ -108,7 +142,7 @@ const TasksPage: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  
+
                   <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-primary transition-colors line-clamp-2">
                     {task.title}
                   </h3>
@@ -117,13 +151,24 @@ const TasksPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+                <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 relative z-10">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
                     <BrainCircuit className="w-4 h-4" />
                     {task.author}
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-colors">
-                    <ChevronRight className="w-4 h-4" />
+                  <div className="flex items-center gap-2">
+                    {isTeamLeader && (
+                      <button
+                        onClick={(e) => handleDeleteTask(e, task.id)}
+                        className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+                        title="Отозвать (удалить) задачу"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-colors">
+                      <ChevronRight className="w-5 h-5" />
+                    </div>
                   </div>
                 </div>
               </motion.div>

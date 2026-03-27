@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Send, 
-  HelpCircle, 
-  CheckCircle2, 
-  Lightbulb, 
-  User, 
-  RefreshCw, 
+import {
+  Send,
+  HelpCircle,
+  CheckCircle2,
+  Lightbulb,
+  User,
+  RefreshCw,
   ChevronRight,
   BrainCircuit,
   Award,
@@ -53,7 +53,7 @@ export const AISimulator: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const targetTaskId = searchParams.get('taskId');
-  
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
@@ -78,12 +78,12 @@ export const AISimulator: React.FC = () => {
             category: t.mode === 'simulation' ? 'Симуляция' : 'Код',
             isSolved: solvedTaskIds.includes(t.id)
           }));
-          
+
           // Оставляем только нерешенные задачи
           const activeTasks = formattedTasks.filter(t => !t.isSolved);
-          
+
           setTasks(activeTasks);
-          
+
           if (activeTasks.length > 0) {
             if (targetTaskId) {
               const found = activeTasks.find((t: Task) => t.id === targetTaskId);
@@ -146,17 +146,17 @@ export const AISimulator: React.FC = () => {
 
   const handleCheckSolution = async () => {
     if (!currentTask || (!userInput.trim() && !selectedFile)) return;
-    
+
     setIsChecking(true);
-    
+
     try {
       // Всегда считаем ответ правильным для прогресса
       setProgress(prev => {
         const solvedTasks = prev.solvedTasks || [];
         if (!solvedTasks.includes(currentTask.id)) {
-          return { 
-            ...prev, 
-            solvedCount: prev.solvedCount + 1, 
+          return {
+            ...prev,
+            solvedCount: prev.solvedCount + 1,
             totalAttempts: prev.totalAttempts + 1,
             solvedTasks: [...solvedTasks, currentTask.id]
           };
@@ -166,14 +166,14 @@ export const AISimulator: React.FC = () => {
 
       // Получаем фидбэк от ИИ через geminiService
       const { getGeminiResponse } = await import('../lib/geminiService');
-      
+
       const userText = userInput || (selectedFile ? `[Файл прикреплен: ${selectedFile.name}]` : 'Нет ответа');
-      
+
       setChatMessages(prev => [
-        ...prev, 
+        ...prev,
         { id: Date.now().toString(), role: 'user', text: `Проверь мое решение:\n${userText}` }
       ]);
-      
+
       const prompt = `
 Ты - AI-ментор. Твоя основная роль - сравнивать ответ пользователя на правильность, не строго с эталоном, а проверять, можно ли засчитать ответ правильным по смыслу и логически. В случае чего - помогай пользователю.
 
@@ -190,12 +190,14 @@ ${userText}
 `;
 
       const aiResponse = await getGeminiResponse(prompt, []);
-      
+
       setChatMessages(prev => [
         ...prev,
         { id: Date.now().toString(), role: 'ai', text: aiResponse }
       ]);
-      
+
+      setTasks(prev => prev.filter(t => t.id !== currentTask.id));
+
     } catch (error) {
       console.error(error);
       setChatMessages(prev => [
@@ -203,36 +205,36 @@ ${userText}
         { id: Date.now().toString(), role: 'ai', text: '🤖 Тимлидер: Не удалось получить ответ от ИИ. Проверь подключение.', isError: true }
       ]);
     }
-    
+
     setIsChecking(false);
   };
 
   const handleSendMessage = async () => {
     if (!currentTask || !chatInput.trim()) return;
-    
+
     const messageText = chatInput;
     setChatInput('');
     setIsChatting(true);
-    
+
     setChatMessages(prev => [
       ...prev,
       { id: Date.now().toString(), role: 'user', text: messageText }
     ]);
-    
+
     try {
       const { getGeminiResponse } = await import('../lib/geminiService');
-      
+
       // Формируем историю чата для Gemini
       const history = chatMessages.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.text }]
       }));
-      
+
       // Добавляем контекст текущей задачи в промпт, чтобы ИИ понимал о чем речь
       const contextPrefix = `Контекст: Мы обсуждаем задачу "${currentTask.title}". Описание: "${currentTask.description}".\nЭталонное решение: "${currentTask.solution}".\n\nВопрос пользователя: `;
-      
+
       const aiResponse = await getGeminiResponse(contextPrefix + messageText, history);
-      
+
       setChatMessages(prev => [
         ...prev,
         { id: Date.now().toString(), role: 'ai', text: aiResponse }
@@ -244,7 +246,7 @@ ${userText}
         { id: Date.now().toString(), role: 'ai', text: 'Произошла ошибка при отправке сообщения.', isError: true }
       ]);
     }
-    
+
     setIsChatting(false);
   };
 
@@ -256,8 +258,19 @@ ${userText}
   };
 
   const nextTask = () => {
-    if (tasks.length === 0 || !currentTask) return;
-    const nextIndex = (tasks.indexOf(currentTask) + 1) % tasks.length;
+    if (tasks.length === 0) {
+      setCurrentTask(null);
+      setUserInput('');
+      setChatMessages([]);
+      setChatInput('');
+      return;
+    }
+    if (!currentTask) return;
+
+    // If the current task was just removed (solved), indexOf is -1, so nextIndex is 0
+    const currentIndex = tasks.findIndex(t => t.id === currentTask.id);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % tasks.length;
+
     setCurrentTask(tasks[nextIndex]);
     setUserInput('');
     setChatMessages([]);
@@ -268,7 +281,7 @@ ${userText}
     <div className="min-h-screen bg-[#F4F6FB] pt-8 pb-16">
       <div className="max-w-5xl mx-auto px-6 space-y-8">
         {/* Navigation */}
-        <button 
+        <button
           onClick={() => navigate('/dashboard')}
           className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors font-bold text-sm group"
         >
@@ -289,7 +302,7 @@ ${userText}
             </h1>
             <p className="text-slate-500 mt-2 font-medium">Тренируйся на реальных задачах нашей команды</p>
           </div>
-          
+
           <div className="premium-glass px-6 py-4 rounded-[24px] flex items-center gap-8 border-white/80 bg-white/40 shadow-xl shadow-slate-200/40">
             <div className="text-center">
               <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Решено</p>
@@ -322,149 +335,149 @@ ${userText}
               </div>
             ) : (
               <>
-                <motion.div 
+                <motion.div
                   key={currentTask.id}
                   initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="premium-glass p-8 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40 relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 p-6 opacity-[0.03] pointer-events-none">
-                <BrainCircuit className="w-32 h-32" />
-              </div>
-
-              <div className="flex justify-between items-start mb-6">
-                <span className="px-4 py-1.5 bg-primary/10 text-primary text-[10px] font-black rounded-full uppercase tracking-widest border border-primary/10">
-                  {currentTask.category}
-                </span>
-                <button 
-                  onClick={nextTask}
-                  className="text-slate-400 hover:text-primary transition-all flex items-center gap-1.5 text-xs font-black uppercase tracking-widest group"
+                  animate={{ opacity: 1, y: 0 }}
+                  className="premium-glass p-8 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40 relative overflow-hidden"
                 >
-                  Следующая <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </button>
-              </div>
-              
-              <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">{currentTask.title}</h2>
-              <p className="text-slate-600 leading-relaxed mb-8 font-medium text-lg">
-                {currentTask.description}
-              </p>
-
-              {currentTask.taskFileName && (
-                <div className="mb-8 flex items-center gap-3 p-4 bg-primary/5 border border-primary/10 rounded-2xl w-fit">
-                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/5">
-                    <FileText className="w-5 h-5" />
+                  <div className="absolute top-0 right-0 p-6 opacity-[0.03] pointer-events-none">
+                    <BrainCircuit className="w-32 h-32" />
                   </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Прикрепленный файл задачи</p>
-                    <p className="text-sm font-bold text-primary truncate max-w-[200px]">{currentTask.taskFileName}</p>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex items-center gap-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
-                <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm">
-                  <User className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Автор задачи</p>
-                  <p className="text-base font-bold text-slate-800">{currentTask.author}</p>
-                </div>
-              </div>
-            </motion.div>
 
-            <div className="space-y-4">
-              <label className="text-sm font-black text-slate-800 flex items-center gap-2 ml-2 uppercase tracking-widest">
-                Твое решение
-              </label>
-              <textarea
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                placeholder="Введи решение задачи..."
-                className="input-premium min-h-[240px] font-mono text-sm leading-relaxed resize-none p-6 rounded-[24px] border-white shadow-xl shadow-slate-200/20 bg-white/80"
-              />
-              
-              <div className="flex flex-wrap gap-4 pt-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className="hidden"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx"
-                />
-                
-                <button
-                  onClick={handleCheckSolution}
-                  disabled={isChecking || (!userInput.trim() && !selectedFile)}
-                  className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-[20px] font-black flex items-center gap-3 flex-1 justify-center transition-all hover:translate-y-[-4px] active:translate-y-0 shadow-xl shadow-primary/25 disabled:opacity-50 disabled:translate-y-0"
-                >
-                  {isChecking ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-5 h-5" />
-                  )}
-                  {isChecking ? 'Проверяем...' : 'Получить фидбэк от ИИ'}
-                </button>
-                
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-6 py-4 rounded-[20px] border-2 border-slate-100 bg-white hover:border-slate-200 text-slate-700 font-black flex items-center gap-3 transition-all active:scale-95 shadow-sm"
-                  title="Прикрепить Word, Excel или PDF"
-                >
-                  <FileUp className="w-5 h-5 text-primary" />
-                  Загрузить док
-                </button>
-
-                <button
-                  onClick={handleAskAuthor}
-                  className="px-6 py-4 rounded-[20px] border-2 border-slate-100 bg-white hover:border-slate-200 text-slate-700 font-black flex items-center gap-3 transition-all active:scale-95 shadow-sm"
-                >
-                  <HelpCircle className="w-5 h-5 text-slate-300" />
-                  Помощь
-                </button>
-              </div>
-
-              {selectedFile && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-3 p-3 bg-white/50 border border-slate-200 rounded-2xl w-fit"
-                >
-                  <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-primary" />
+                  <div className="flex justify-between items-start mb-6">
+                    <span className="px-4 py-1.5 bg-primary/10 text-primary text-[10px] font-black rounded-full uppercase tracking-widest border border-primary/10">
+                      {currentTask.category}
+                    </span>
+                    <button
+                      onClick={nextTask}
+                      className="text-slate-400 hover:text-primary transition-all flex items-center gap-1.5 text-xs font-black uppercase tracking-widest group"
+                    >
+                      Следующая <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                    </button>
                   </div>
-                  <div className="flex flex-col pr-4">
-                    <span className="text-xs font-black text-slate-800 truncate max-w-[150px]">{selectedFile.name}</span>
-                    <span className="text-[10px] text-slate-400 font-bold">{(selectedFile.size / 1024).toFixed(1)} KB</span>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      setSelectedFile(null);
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                    className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"
-                  >
-                    <X className="w-4 h-4 text-slate-400" />
-                  </button>
-                </motion.div>
-              )}
-              
-              <AnimatePresence>
-                {showAuthorHelp && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="p-4 bg-accent/10 border border-accent/20 rounded-2xl text-accent text-sm font-bold flex items-center gap-3"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
-                      <Send className="w-4 h-4" />
+
+                  <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">{currentTask.title}</h2>
+                  <p className="text-slate-600 leading-relaxed mb-8 font-medium text-lg">
+                    {currentTask.description}
+                  </p>
+
+                  {currentTask.taskFileName && (
+                    <div className="mb-8 flex items-center gap-3 p-4 bg-primary/5 border border-primary/10 rounded-2xl w-fit">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/5">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Прикрепленный файл задачи</p>
+                        <p className="text-sm font-bold text-primary truncate max-w-[200px]">{currentTask.taskFileName}</p>
+                      </div>
                     </div>
-                    Запрос на помощь успешно отправлен автору {currentTask.author}!
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            </>
+                  )}
+
+                  <div className="flex items-center gap-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
+                    <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm">
+                      <User className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Автор задачи</p>
+                      <p className="text-base font-bold text-slate-800">{currentTask.author}</p>
+                    </div>
+                  </div>
+                </motion.div>
+
+                <div className="space-y-4">
+                  <label className="text-sm font-black text-slate-800 flex items-center gap-2 ml-2 uppercase tracking-widest">
+                    Твое решение
+                  </label>
+                  <textarea
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    placeholder="Введи решение задачи..."
+                    className="input-premium min-h-[240px] font-mono text-sm leading-relaxed resize-none p-6 rounded-[24px] border-white shadow-xl shadow-slate-200/20 bg-white/80"
+                  />
+
+                  <div className="flex flex-wrap gap-4 pt-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx"
+                    />
+
+                    <button
+                      onClick={handleCheckSolution}
+                      disabled={isChecking || (!userInput.trim() && !selectedFile)}
+                      className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-[20px] font-black flex items-center gap-3 flex-1 justify-center transition-all hover:translate-y-[-4px] active:translate-y-0 shadow-xl shadow-primary/25 disabled:opacity-50 disabled:translate-y-0"
+                    >
+                      {isChecking ? (
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-5 h-5" />
+                      )}
+                      {isChecking ? 'Проверяем...' : 'Получить фидбэк от ИИ'}
+                    </button>
+
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-6 py-4 rounded-[20px] border-2 border-slate-100 bg-white hover:border-slate-200 text-slate-700 font-black flex items-center gap-3 transition-all active:scale-95 shadow-sm"
+                      title="Прикрепить Word, Excel или PDF"
+                    >
+                      <FileUp className="w-5 h-5 text-primary" />
+                      Загрузить док
+                    </button>
+
+                    <button
+                      onClick={handleAskAuthor}
+                      className="px-6 py-4 rounded-[20px] border-2 border-slate-100 bg-white hover:border-slate-200 text-slate-700 font-black flex items-center gap-3 transition-all active:scale-95 shadow-sm"
+                    >
+                      <HelpCircle className="w-5 h-5 text-slate-300" />
+                      Помощь
+                    </button>
+                  </div>
+
+                  {selectedFile && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex items-center gap-3 p-3 bg-white/50 border border-slate-200 rounded-2xl w-fit"
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex flex-col pr-4">
+                        <span className="text-xs font-black text-slate-800 truncate max-w-[150px]">{selectedFile.name}</span>
+                        <span className="text-[10px] text-slate-400 font-bold">{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedFile(null);
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"
+                      >
+                        <X className="w-4 h-4 text-slate-400" />
+                      </button>
+                    </motion.div>
+                  )}
+
+                  <AnimatePresence>
+                    {showAuthorHelp && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="p-4 bg-accent/10 border border-accent/20 rounded-2xl text-accent text-sm font-bold flex items-center gap-3"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                          <Send className="w-4 h-4" />
+                        </div>
+                        Запрос на помощь успешно отправлен автору {currentTask.author}!
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </>
             )}
           </section>
 
@@ -478,8 +491,8 @@ ${userText}
                   </div>
                   ИИ чат
                 </h3>
-                
-                <div 
+
+                <div
                   ref={chatContainerRef}
                   className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4"
                 >
@@ -504,36 +517,36 @@ ${userText}
                             msg.role === 'user'
                               ? "bg-white border-slate-100 text-slate-800 ml-8 shadow-sm"
                               : msg.isError
-                              ? "bg-red-50 border-red-100 text-red-800 mr-8 shadow-sm"
-                              : "bg-emerald-50 border-emerald-100 text-emerald-800 mr-8 shadow-sm"
+                                ? "bg-red-50 border-red-100 text-red-800 mr-8 shadow-sm"
+                                : "bg-emerald-50 border-emerald-100 text-emerald-800 mr-8 shadow-sm"
                           )}
                         >
                           <div className="flex items-start gap-3">
-                             <div className={cn(
-                               "p-1.5 rounded-lg mt-0.5 shrink-0",
-                               msg.role === 'user' 
-                                 ? "bg-slate-100" 
-                                 : msg.isError 
-                                 ? "bg-red-200" 
-                                 : "bg-emerald-200"
-                             )}>
-                               {msg.role === 'user' ? <User className="w-4 h-4" /> : <BrainCircuit className="w-4 h-4" />}
-                             </div>
-                             <div className="flex-1 overflow-hidden">
-                               <ReactMarkdown
-                                 components={{
-                                   p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
-                                   ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
-                                   ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
-                                   li: ({node, ...props}) => <li {...props} />,
-                                   strong: ({node, ...props}) => <strong className="font-bold text-slate-900" {...props} />,
-                                   h3: ({node, ...props}) => <h3 className="font-bold text-base mt-3 mb-1" {...props} />,
-                                   h4: ({node, ...props}) => <h4 className="font-bold mt-2 mb-1" {...props} />
-                                 }}
-                               >
-                                 {msg.text}
-                               </ReactMarkdown>
-                             </div>
+                            <div className={cn(
+                              "p-1.5 rounded-lg mt-0.5 shrink-0",
+                              msg.role === 'user'
+                                ? "bg-slate-100"
+                                : msg.isError
+                                  ? "bg-red-200"
+                                  : "bg-emerald-200"
+                            )}>
+                              {msg.role === 'user' ? <User className="w-4 h-4" /> : <BrainCircuit className="w-4 h-4" />}
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                              <ReactMarkdown
+                                components={{
+                                  p: ({ node, ...props }) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
+                                  ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                                  ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                                  li: ({ node, ...props }) => <li {...props} />,
+                                  strong: ({ node, ...props }) => <strong className="font-bold text-slate-900" {...props} />,
+                                  h3: ({ node, ...props }) => <h3 className="font-bold text-base mt-3 mb-1" {...props} />,
+                                  h4: ({ node, ...props }) => <h4 className="font-bold mt-2 mb-1" {...props} />
+                                }}
+                              >
+                                {msg.text}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         </motion.div>
                       ))
