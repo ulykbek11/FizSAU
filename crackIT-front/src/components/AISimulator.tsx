@@ -1,0 +1,465 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Send, 
+  HelpCircle, 
+  CheckCircle2, 
+  Lightbulb, 
+  User, 
+  RefreshCw, 
+  ChevronRight,
+  BrainCircuit,
+  Award,
+  ArrowLeft,
+  Zap,
+  FileUp,
+  FileText,
+  X
+} from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// --- Интерфейсы ---
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  solution: string;
+  author: string;
+  category: string;
+  taskFileName?: string;
+  solutionFileName?: string;
+}
+
+export interface UserProgress {
+  solvedCount: number;
+  totalAttempts: number;
+  lastSolvedId?: string;
+}
+
+// --- Заглушки данных ---
+export const MOCK_TASKS: Task[] = [
+  {
+    id: '1',
+    title: 'Настройка окружения для нового проекта',
+    description: 'Нужно инициализировать проект с использованием Vite, React и Tailwind CSS. Какие команды нужно выполнить в терминале для установки всех зависимостей и запуска сервера разработки?',
+    solution: 'npm create vite@latest . -- --template react-ts\nnpm install -D tailwindcss postcss autoprefixer\nnpx tailwindcss init -p\nnpm run dev',
+    author: 'Алексей Иванов (Team Lead)',
+    category: 'DevOps / Setup'
+  },
+  {
+    id: '2',
+    title: 'Обработка ошибок в API-запросах',
+    description: 'Напишите базовый паттерн использования try-catch блока для fetch-запроса, который проверяет response.ok и выбрасывает ошибку с текстом из ответа, если запрос неудачен.',
+    solution: 'try {\n  const res = await fetch(url);\n  if (!res.ok) throw new Error(await res.text());\n  return await res.json();\n} catch (err) {\n  console.error(err);\n}',
+    author: 'Мария Петрова (Senior Dev)',
+    category: 'Frontend'
+  }
+];
+
+// --- Компонент ---
+export const AISimulator: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const targetTaskId = searchParams.get('taskId');
+  
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+  const [currentTask, setCurrentTask] = useState<Task>(MOCK_TASKS[0]);
+
+  // Загрузка задач (MOCK + Custom)
+  useEffect(() => {
+    const customTasks = JSON.parse(localStorage.getItem('custom_tasks') || '[]');
+    const allTasks = [...MOCK_TASKS, ...customTasks];
+    setTasks(allTasks);
+    if (allTasks.length > 0) {
+      if (targetTaskId) {
+        const found = allTasks.find(t => t.id === targetTaskId);
+        if (found) setCurrentTask(found);
+        else setCurrentTask(allTasks[0]);
+      } else {
+        setCurrentTask(allTasks[0]);
+      }
+    }
+  }, [targetTaskId]);
+
+  const [userInput, setUserInput] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'hint' | 'success' | 'none', text: string }>({ type: 'none', text: '' });
+  const [isChecking, setIsChecking] = useState(false);
+  const [progress, setProgress] = useState<UserProgress>({ solvedCount: 0, totalAttempts: 0 });
+  const [showAuthorHelp, setShowAuthorHelp] = useState(false);
+
+  // Загрузка прогресса
+  useEffect(() => {
+    const saved = localStorage.getItem('ai_simulator_progress');
+    if (saved) setProgress(JSON.parse(saved));
+  }, []);
+
+  // Сохранение прогресса
+  useEffect(() => {
+    localStorage.setItem('ai_simulator_progress', JSON.stringify(progress));
+  }, [progress]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      // Если файл загружен, можно добавить текст-заглушку в поле ввода
+      if (!userInput.trim()) {
+        setUserInput(`[Файл прикреплен: ${file.name}]\n\nЯ прикрепил документ с решением.`);
+      }
+    }
+  };
+
+  const handleCheckSolution = async () => {
+    if (!userInput.trim() && !selectedFile) return;
+    
+    setIsChecking(true);
+    
+    try {
+      if (selectedFile) {
+        // Call the new AI Simulation Engine Backend
+        const formData = new FormData();
+        formData.append('userSolution', selectedFile);
+        formData.append('userId', 'test-user-id');
+        
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/tasks/${currentTask.id}/submit`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error('Ошибка сервера при проверке решения');
+        }
+        
+        const data = await response.json();
+        const evaluation = data.evaluation;
+        
+        setFeedback({ 
+          type: evaluation.score >= 80 ? 'success' : 'hint', 
+          text: `🤖 Оценка: ${evaluation.score}/100. ${evaluation.feedback}` 
+        });
+        setProgress(prev => ({ 
+          ...prev, 
+          solvedCount: evaluation.score >= 80 ? prev.solvedCount + 1 : prev.solvedCount, 
+          totalAttempts: prev.totalAttempts + 1 
+        }));
+      } else {
+        // Fallback text check (MOCK) if no file provided
+        setTimeout(() => {
+          const normalizedUser = userInput.toLowerCase().replace(/\s+/g, ' ');
+          const normalizedSolution = currentTask.solution.toLowerCase().replace(/\s+/g, ' ');
+
+          if (normalizedUser.includes(normalizedSolution.substring(0, 20)) || normalizedUser === normalizedSolution) {
+            setFeedback({ 
+              type: 'success', 
+              text: 'Отлично! Твое решение совпадает с эталонным. Ты правильно уловил суть задачи.' 
+            });
+            setProgress(prev => ({ ...prev, solvedCount: prev.solvedCount + 1, totalAttempts: prev.totalAttempts + 1 }));
+          } else {
+            let hint = 'Хм, неплохое начало, но попробуй обратить внимание на ';
+            if (!normalizedUser.includes('npm')) hint += 'использование пакетного менеджера (npm/yarn).';
+            else if (!normalizedUser.includes('tailwind')) hint += 'настройку стилей через Tailwind.';
+            else hint = 'Твое решение отличается от того, как мы обычно это делаем. Попробуй упростить структуру или проверь синтаксис.';
+            
+            setFeedback({ type: 'hint', text: `🤖 Тимлидер: ${hint}` });
+            setProgress(prev => ({ ...prev, totalAttempts: prev.totalAttempts + 1 }));
+          }
+          setIsChecking(false);
+        }, 1500);
+        return; // Early return so we don't set isChecking to false immediately
+      }
+    } catch (error) {
+      console.error(error);
+      setFeedback({ type: 'hint', text: '🤖 Тимлидер: Не удалось подключиться к бэкенду. Убедитесь, что сервер запущен.' });
+    }
+    
+    setIsChecking(false);
+  };
+
+  const handleAskAuthor = () => {
+    setShowAuthorHelp(true);
+    setTimeout(() => setShowAuthorHelp(false), 3000);
+    console.log(`Сообщение отправлено автору: ${currentTask.author}. Задача: ${currentTask.title}`);
+  };
+
+  const nextTask = () => {
+    const nextIndex = (tasks.indexOf(currentTask) + 1) % tasks.length;
+    setCurrentTask(tasks[nextIndex]);
+    setUserInput('');
+    setFeedback({ type: 'none', text: '' });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F4F6FB] pt-8 pb-16">
+      <div className="max-w-5xl mx-auto px-6 space-y-8">
+        {/* Navigation */}
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors font-bold text-sm group"
+        >
+          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100 group-hover:border-primary/20">
+            <ArrowLeft className="w-4 h-4" />
+          </div>
+          Вернуться в дашборд
+        </button>
+
+        {/* Header & Stats */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3 tracking-tight">
+              <div className="p-2 bg-slate-900 rounded-2xl shadow-lg">
+                <BrainCircuit className="text-white w-6 h-6" />
+              </div>
+              AI-Симулятор
+            </h1>
+            <p className="text-slate-500 mt-2 font-medium">Тренируйся на реальных задачах нашей команды</p>
+          </div>
+          
+          <div className="premium-glass px-6 py-4 rounded-[24px] flex items-center gap-8 border-white/80 bg-white/40 shadow-xl shadow-slate-200/40">
+            <div className="text-center">
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Решено</p>
+              <p className="text-2xl font-black text-primary">{progress.solvedCount}</p>
+            </div>
+            <div className="h-10 w-px bg-slate-200/60" />
+            <div className="text-center">
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Попыток</p>
+              <p className="text-2xl font-black text-slate-800">{progress.totalAttempts}</p>
+            </div>
+            <div className="h-10 w-px bg-slate-200/60" />
+            <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
+              <Award className="text-accent w-6 h-6" />
+            </div>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Task Section */}
+          <section className="lg:col-span-7 space-y-6">
+            <motion.div 
+              key={currentTask.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="premium-glass p-8 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-6 opacity-[0.03] pointer-events-none">
+                <BrainCircuit className="w-32 h-32" />
+              </div>
+
+              <div className="flex justify-between items-start mb-6">
+                <span className="px-4 py-1.5 bg-primary/10 text-primary text-[10px] font-black rounded-full uppercase tracking-widest border border-primary/10">
+                  {currentTask.category}
+                </span>
+                <button 
+                  onClick={nextTask}
+                  className="text-slate-400 hover:text-primary transition-all flex items-center gap-1.5 text-xs font-black uppercase tracking-widest group"
+                >
+                  Следующая <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              </div>
+              
+              <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">{currentTask.title}</h2>
+              <p className="text-slate-600 leading-relaxed mb-8 font-medium text-lg">
+                {currentTask.description}
+              </p>
+
+              {currentTask.taskFileName && (
+                <div className="mb-8 flex items-center gap-3 p-4 bg-primary/5 border border-primary/10 rounded-2xl w-fit">
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/5">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Прикрепленный файл задачи</p>
+                    <p className="text-sm font-bold text-primary truncate max-w-[200px]">{currentTask.taskFileName}</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
+                <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm">
+                  <User className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Автор задачи</p>
+                  <p className="text-base font-bold text-slate-800">{currentTask.author}</p>
+                </div>
+              </div>
+            </motion.div>
+
+            <div className="space-y-4">
+              <label className="text-sm font-black text-slate-800 flex items-center gap-2 ml-2 uppercase tracking-widest">
+                Твое решение
+              </label>
+              <textarea
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                placeholder="Введи решение задачи..."
+                className="input-premium min-h-[240px] font-mono text-sm leading-relaxed resize-none p-6 rounded-[24px] border-white shadow-xl shadow-slate-200/20 bg-white/80"
+              />
+              
+              <div className="flex flex-wrap gap-4 pt-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx"
+                />
+                
+                <button
+                  onClick={handleCheckSolution}
+                  disabled={isChecking || !userInput.trim()}
+                  className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-[20px] font-black flex items-center gap-3 flex-1 justify-center transition-all hover:translate-y-[-4px] active:translate-y-0 shadow-xl shadow-primary/25 disabled:opacity-50 disabled:translate-y-0"
+                >
+                  {isChecking ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5" />
+                  )}
+                  {isChecking ? 'Проверяем...' : 'Проверить решение'}
+                </button>
+                
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-6 py-4 rounded-[20px] border-2 border-slate-100 bg-white hover:border-slate-200 text-slate-700 font-black flex items-center gap-3 transition-all active:scale-95 shadow-sm"
+                  title="Прикрепить Word, Excel или PDF"
+                >
+                  <FileUp className="w-5 h-5 text-primary" />
+                  Загрузить док
+                </button>
+
+                <button
+                  onClick={handleAskAuthor}
+                  className="px-6 py-4 rounded-[20px] border-2 border-slate-100 bg-white hover:border-slate-200 text-slate-700 font-black flex items-center gap-3 transition-all active:scale-95 shadow-sm"
+                >
+                  <HelpCircle className="w-5 h-5 text-slate-300" />
+                  Помощь
+                </button>
+              </div>
+
+              {selectedFile && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-3 p-3 bg-white/50 border border-slate-200 rounded-2xl w-fit"
+                >
+                  <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex flex-col pr-4">
+                    <span className="text-xs font-black text-slate-800 truncate max-w-[150px]">{selectedFile.name}</span>
+                    <span className="text-[10px] text-slate-400 font-bold">{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setSelectedFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4 text-slate-400" />
+                  </button>
+                </motion.div>
+              )}
+              
+              <AnimatePresence>
+                {showAuthorHelp && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="p-4 bg-accent/10 border border-accent/20 rounded-2xl text-accent text-sm font-bold flex items-center gap-3"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                      <Send className="w-4 h-4" />
+                    </div>
+                    Запрос на помощь успешно отправлен автору {currentTask.author}!
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </section>
+
+          {/* Feedback Section */}
+          <aside className="lg:col-span-5">
+            <div className="sticky top-8 space-y-6">
+              <div className="premium-glass p-8 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3 tracking-tight">
+                  <div className="p-2 bg-amber-100 rounded-xl">
+                    <Lightbulb className="text-amber-500 w-5 h-5" />
+                  </div>
+                  Обратная связь AI
+                </h3>
+                
+                <AnimatePresence mode="wait">
+                  {feedback.type !== 'none' ? (
+                    <motion.div
+                      key={feedback.text}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className={cn(
+                        "p-6 rounded-[24px] border-2 leading-relaxed font-medium",
+                        feedback.type === 'success' 
+                          ? "bg-emerald-50 border-emerald-100 text-emerald-800 shadow-lg shadow-emerald-500/10" 
+                          : "bg-amber-50 border-amber-100 text-amber-800 shadow-lg shadow-amber-500/10"
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                         <div className={cn(
+                           "p-1.5 rounded-lg mt-0.5",
+                           feedback.type === 'success' ? "bg-emerald-200" : "bg-amber-200"
+                         )}>
+                           {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                         </div>
+                         {feedback.text}
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <div className="py-12 text-center space-y-4">
+                      <div className="w-20 h-20 bg-slate-100/80 rounded-[28px] flex items-center justify-center mx-auto text-slate-300 border border-slate-200/50 shadow-inner">
+                        <BrainCircuit className="w-10 h-10" />
+                      </div>
+                      <p className="text-slate-400 font-bold text-sm max-w-[200px] mx-auto leading-relaxed">
+                        Реши задачу, чтобы получить совет от тимлидера.
+                      </p>
+                    </div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="p-8 rounded-[32px] bg-gradient-to-br from-primary to-primary/90 border border-white/10 shadow-2xl shadow-primary/20 relative overflow-hidden group">
+                <div className="absolute -right-4 -bottom-4 text-white/10 group-hover:rotate-12 transition-transform duration-500">
+                  <BrainCircuit className="w-24 h-24" />
+                </div>
+                <h4 className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] mb-4">Как это работает?</h4>
+                <ul className="space-y-4 text-sm text-white/90 font-medium">
+                  <li className="flex gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black shrink-0 shadow-inner">1</div>
+                    AI анализирует твое решение по 12 параметрам качества кода.
+                  </li>
+                  <li className="flex gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black shrink-0 shadow-inner">2</div>
+                    Получаешь контекстные советы без прямого ответа.
+                  </li>
+                  <li className="flex gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black shrink-0 shadow-inner">3</div>
+                    Учишься решать задачи так, как принято в нашей команде.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AISimulator;
