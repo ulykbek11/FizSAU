@@ -4,13 +4,22 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+const evaluationModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+const chatModel = genAI.getGenerativeModel({
+  model: 'gemini-2.5-flash-lite',
+  systemInstruction: 'Ты — профессиональный AI-тимлидер по имени Beyim в инновационной компании Beyim. Твоя цель — помогать новым сотрудникам в онбординге, отвечать на их вопросы о культуре компании, процессах и задачах. Твой тон — дружелюбный, поддерживающий и профессиональный. Используй Markdown для форматирования ответов (жирный текст, списки, заголовки).'
+});
 
 interface EvaluationParams {
   description: string;
   solutionDiff: string;
   userDiff: string;
   evaluationCriteria: string[];
+}
+
+interface ChatMessage {
+  role: 'user' | 'model';
+  parts: { text: string }[];
 }
 
 export class AIService {
@@ -49,7 +58,7 @@ ${params.userDiff}
     `;
 
     try {
-      const result = await model.generateContent(prompt);
+      const result = await evaluationModel.generateContent(prompt);
       const responseText = result.response.text();
       
       // Clean up markdown code block if present
@@ -58,6 +67,25 @@ ${params.userDiff}
       return JSON.parse(jsonStr);
     } catch (error) {
       console.error('Error in AI evaluation:', error);
+      throw error;
+    }
+  }
+
+  static async generateChatResponse(prompt: string, history: ChatMessage[] = []): Promise<string> {
+    try {
+      const normalizedHistory = history.filter(
+        (message) =>
+          (message.role === 'user' || message.role === 'model') &&
+          Array.isArray(message.parts) &&
+          message.parts.length > 0 &&
+          typeof message.parts[0]?.text === 'string'
+      );
+
+      const chat = chatModel.startChat({ history: normalizedHistory });
+      const result = await chat.sendMessage(prompt);
+      return result.response.text();
+    } catch (error) {
+      console.error('Error in AI chat:', error);
       throw error;
     }
   }

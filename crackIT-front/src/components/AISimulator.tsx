@@ -11,7 +11,6 @@ import {
   BrainCircuit,
   Award,
   ArrowLeft,
-  Zap,
   FileUp,
   FileText,
   X
@@ -19,6 +18,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import ReactMarkdown from 'react-markdown';
 
 import { supabase } from '../lib/supabaseClient';
 
@@ -46,8 +46,7 @@ export interface UserProgress {
   solvedTasks?: string[];
 }
 
-// --- Заглушки данных ---
-export const MOCK_TASKS: Task[] = [];
+
 
 // --- Компонент ---
 export const AISimulator: React.FC = () => {
@@ -111,42 +110,28 @@ export const AISimulator: React.FC = () => {
 
   const [userInput, setUserInput] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [feedback, setFeedback] = useState<{ type: 'hint' | 'success' | 'none', text: string }>({ type: 'none', text: '' });
-  const [isChecking, setIsChecking] = useState(false);
-  const [progress, setProgress] = useState<UserProgress>({ solvedCount: 0, totalAttempts: 0, solvedTasks: [] });
-  const [showAuthorHelp, setShowAuthorHelp] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ id: string; role: 'user' | 'ai'; text: string; isError?: boolean }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
+  const chatContainerRef = React.useRef<HTMLDivElement>(null);
 
-  // Загрузка прогресса
+  // Auto-scroll chat to bottom
   useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+  const [isChecking, setIsChecking] = useState(false);
+  const [progress, setProgress] = useState<UserProgress>(() => {
     const saved = localStorage.getItem('ai_simulator_progress');
-    if (saved) setProgress(JSON.parse(saved));
-  }, []);
+    return saved ? JSON.parse(saved) : { solvedCount: 0, totalAttempts: 0, solvedTasks: [] };
+  });
+  const [showAuthorHelp, setShowAuthorHelp] = useState(false);
 
   // Сохранение прогресса
   useEffect(() => {
     localStorage.setItem('ai_simulator_progress', JSON.stringify(progress));
-    
-    // Если текущая задача была решена, она должна "отпасть" из списка активных
-    if (progress.solvedTasks && progress.solvedTasks.length > 0) {
-      setTasks(prevTasks => {
-        const activeTasks = prevTasks.filter(t => !progress.solvedTasks?.includes(t.id));
-        if (activeTasks.length !== prevTasks.length) {
-          // Если текущая задача была решена, переключаемся на следующую или обнуляем
-          if (currentTask && progress.solvedTasks?.includes(currentTask.id)) {
-            if (activeTasks.length > 0) {
-              setCurrentTask(activeTasks[0]);
-            } else {
-              setCurrentTask(null);
-            }
-            setFeedback({ type: 'none', text: '' });
-            setUserInput('');
-          }
-          return activeTasks;
-        }
-        return prevTasks;
-      });
-    }
-  }, [progress, currentTask]);
+  }, [progress]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -165,90 +150,102 @@ export const AISimulator: React.FC = () => {
     setIsChecking(true);
     
     try {
-      if (selectedFile) {
-        // Call the new AI Simulation Engine Backend
-        const formData = new FormData();
-        formData.append('userSolution', selectedFile);
-        formData.append('userId', 'test-user-id');
-        
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/tasks/${currentTask?.id}/submit`, {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          throw new Error('Ошибка при проверке решения');
-        }
-        
-        const data = await response.json();
-        const evaluation = data.evaluation;
-        
-        setFeedback({ 
-          type: evaluation.score >= 80 ? 'success' : 'hint', 
-          text: `🤖 Оценка: ${evaluation.score}/100. ${evaluation.feedback}` 
-        });
-        
-        if (evaluation.score >= 80) {
-          setProgress(prev => {
-            const solvedTasks = prev.solvedTasks || [];
-            if (!solvedTasks.includes(currentTask.id)) {
-              return { 
-                ...prev, 
-                solvedCount: prev.solvedCount + 1, 
-                totalAttempts: prev.totalAttempts + 1,
-                solvedTasks: [...solvedTasks, currentTask.id]
-              };
-            }
-            return { ...prev, totalAttempts: prev.totalAttempts + 1 };
-          });
-        } else {
-          setProgress(prev => ({ 
+      // Всегда считаем ответ правильным для прогресса
+      setProgress(prev => {
+        const solvedTasks = prev.solvedTasks || [];
+        if (!solvedTasks.includes(currentTask.id)) {
+          return { 
             ...prev, 
-            totalAttempts: prev.totalAttempts + 1 
-          }));
+            solvedCount: prev.solvedCount + 1, 
+            totalAttempts: prev.totalAttempts + 1,
+            solvedTasks: [...solvedTasks, currentTask.id]
+          };
         }
-      } else {
-        // Fallback text check (MOCK) if no file provided
-        setTimeout(() => {
-          const normalizedUser = userInput.toLowerCase().replace(/\s+/g, ' ');
-          const normalizedSolution = currentTask.solution.toLowerCase().replace(/\s+/g, ' ');
+        return { ...prev, totalAttempts: prev.totalAttempts + 1 };
+      });
 
-          if (normalizedUser.includes(normalizedSolution.substring(0, 20)) || normalizedUser === normalizedSolution) {
-            setFeedback({ 
-              type: 'success', 
-              text: 'Отлично! Твое решение совпадает с эталонным. Ты правильно уловил суть задачи.' 
-            });
-            setProgress(prev => {
-              const solvedTasks = prev.solvedTasks || [];
-              if (!solvedTasks.includes(currentTask.id)) {
-                return { 
-                  ...prev, 
-                  solvedCount: prev.solvedCount + 1, 
-                  totalAttempts: prev.totalAttempts + 1,
-                  solvedTasks: [...solvedTasks, currentTask.id]
-                };
-              }
-              return { ...prev, totalAttempts: prev.totalAttempts + 1 };
-            });
-          } else {
-            let hint = 'Хм, неплохое начало, но попробуй обратить внимание на ';
-            if (!normalizedUser.includes('npm')) hint += 'использование пакетного менеджера (npm/yarn).';
-            else if (!normalizedUser.includes('tailwind')) hint += 'настройку стилей через Tailwind.';
-            else hint = 'Твое решение отличается от того, как мы обычно это делаем. Попробуй упростить структуру или проверь синтаксис.';
-            
-            setFeedback({ type: 'hint', text: `🤖 Тимлидер: ${hint}` });
-            setProgress(prev => ({ ...prev, totalAttempts: prev.totalAttempts + 1 }));
-          }
-          setIsChecking(false);
-        }, 1500);
-        return; // Early return so we don't set isChecking to false immediately
-      }
+      // Получаем фидбэк от ИИ через geminiService
+      const { getGeminiResponse } = await import('../lib/geminiService');
+      
+      const userText = userInput || (selectedFile ? `[Файл прикреплен: ${selectedFile.name}]` : 'Нет ответа');
+      
+      setChatMessages(prev => [
+        ...prev, 
+        { id: Date.now().toString(), role: 'user', text: `Проверь мое решение:\n${userText}` }
+      ]);
+      
+      const prompt = `
+Ты - AI-ментор. Твоя основная роль - сравнивать ответ пользователя на правильность, не строго с эталоном, а проверять, можно ли засчитать ответ правильным по смыслу и логически. В случае чего - помогай пользователю.
+
+Описание задачи:
+${currentTask.description}
+
+Эталонное решение:
+${currentTask.solution}
+
+Ответ пользователя:
+${userText}
+
+Оцени ответ пользователя логически и дай полезный, поддерживающий фидбэк. Если есть ошибки - мягко укажи на них и подскажи правильный путь. Отвечай от лица ИИ-тимлидера.
+`;
+
+      const aiResponse = await getGeminiResponse(prompt, []);
+      
+      setChatMessages(prev => [
+        ...prev,
+        { id: Date.now().toString(), role: 'ai', text: aiResponse }
+      ]);
+      
     } catch (error) {
       console.error(error);
-      setFeedback({ type: 'hint', text: '🤖 Тимлидер: Не удалось подключиться к бэкенду. Убедитесь, что сервер запущен.' });
+      setChatMessages(prev => [
+        ...prev,
+        { id: Date.now().toString(), role: 'ai', text: '🤖 Тимлидер: Не удалось получить ответ от ИИ. Проверь подключение.', isError: true }
+      ]);
     }
     
     setIsChecking(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!currentTask || !chatInput.trim()) return;
+    
+    const messageText = chatInput;
+    setChatInput('');
+    setIsChatting(true);
+    
+    setChatMessages(prev => [
+      ...prev,
+      { id: Date.now().toString(), role: 'user', text: messageText }
+    ]);
+    
+    try {
+      const { getGeminiResponse } = await import('../lib/geminiService');
+      
+      // Формируем историю чата для Gemini
+      const history = chatMessages.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text }]
+      }));
+      
+      // Добавляем контекст текущей задачи в промпт, чтобы ИИ понимал о чем речь
+      const contextPrefix = `Контекст: Мы обсуждаем задачу "${currentTask.title}". Описание: "${currentTask.description}".\nЭталонное решение: "${currentTask.solution}".\n\nВопрос пользователя: `;
+      
+      const aiResponse = await getGeminiResponse(contextPrefix + messageText, history);
+      
+      setChatMessages(prev => [
+        ...prev,
+        { id: Date.now().toString(), role: 'ai', text: aiResponse }
+      ]);
+    } catch (error) {
+      console.error(error);
+      setChatMessages(prev => [
+        ...prev,
+        { id: Date.now().toString(), role: 'ai', text: 'Произошла ошибка при отправке сообщения.', isError: true }
+      ]);
+    }
+    
+    setIsChatting(false);
   };
 
   const handleAskAuthor = () => {
@@ -263,7 +260,8 @@ export const AISimulator: React.FC = () => {
     const nextIndex = (tasks.indexOf(currentTask) + 1) % tasks.length;
     setCurrentTask(tasks[nextIndex]);
     setUserInput('');
-    setFeedback({ type: 'none', text: '' });
+    setChatMessages([]);
+    setChatInput('');
   };
 
   return (
@@ -396,7 +394,7 @@ export const AISimulator: React.FC = () => {
                 
                 <button
                   onClick={handleCheckSolution}
-                  disabled={isChecking || !userInput.trim()}
+                  disabled={isChecking || (!userInput.trim() && !selectedFile)}
                   className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-[20px] font-black flex items-center gap-3 flex-1 justify-center transition-all hover:translate-y-[-4px] active:translate-y-0 shadow-xl shadow-primary/25 disabled:opacity-50 disabled:translate-y-0"
                 >
                   {isChecking ? (
@@ -404,7 +402,7 @@ export const AISimulator: React.FC = () => {
                   ) : (
                     <CheckCircle2 className="w-5 h-5" />
                   )}
-                  {isChecking ? 'Проверяем...' : 'Проверить решение'}
+                  {isChecking ? 'Проверяем...' : 'Получить фидбэк от ИИ'}
                 </button>
                 
                 <button
@@ -473,70 +471,119 @@ export const AISimulator: React.FC = () => {
           {/* Feedback Section */}
           <aside className="lg:col-span-5">
             <div className="sticky top-8 space-y-6">
-              <div className="premium-glass p-8 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40">
-                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3 tracking-tight">
+              <div className="premium-glass p-6 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40 flex flex-col h-[700px]">
+                <h3 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-3 tracking-tight shrink-0">
                   <div className="p-2 bg-amber-100 rounded-xl">
                     <Lightbulb className="text-amber-500 w-5 h-5" />
                   </div>
-                  Обратная связь AI
+                  ИИ чат
                 </h3>
                 
-                <AnimatePresence mode="wait">
-                  {feedback.type !== 'none' ? (
-                    <motion.div
-                      key={feedback.text}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className={cn(
-                        "p-6 rounded-[24px] border-2 leading-relaxed font-medium",
-                        feedback.type === 'success' 
-                          ? "bg-emerald-50 border-emerald-100 text-emerald-800 shadow-lg shadow-emerald-500/10" 
-                          : "bg-amber-50 border-amber-100 text-amber-800 shadow-lg shadow-amber-500/10"
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                         <div className={cn(
-                           "p-1.5 rounded-lg mt-0.5",
-                           feedback.type === 'success' ? "bg-emerald-200" : "bg-amber-200"
-                         )}>
-                           {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
-                         </div>
-                         {feedback.text}
+                <div 
+                  ref={chatContainerRef}
+                  className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4"
+                >
+                  <AnimatePresence>
+                    {chatMessages.length === 0 ? (
+                      <div className="py-12 text-center space-y-4">
+                        <div className="w-20 h-20 bg-slate-100/80 rounded-[28px] flex items-center justify-center mx-auto text-slate-300 border border-slate-200/50 shadow-inner">
+                          <BrainCircuit className="w-10 h-10" />
+                        </div>
+                        <p className="text-slate-400 font-bold text-sm max-w-[200px] mx-auto leading-relaxed">
+                          Задай вопрос ИИ-тимлидеру или отправь решение на проверку.
+                        </p>
                       </div>
-                    </motion.div>
-                  ) : (
-                    <div className="py-12 text-center space-y-4">
-                      <div className="w-20 h-20 bg-slate-100/80 rounded-[28px] flex items-center justify-center mx-auto text-slate-300 border border-slate-200/50 shadow-inner">
-                        <BrainCircuit className="w-10 h-10" />
-                      </div>
-                      <p className="text-slate-400 font-bold text-sm max-w-[200px] mx-auto leading-relaxed">
-                        Реши задачу, чтобы получить совет от тимлидера.
-                      </p>
-                    </div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <div className="p-8 rounded-[32px] bg-gradient-to-br from-primary to-primary/90 border border-white/10 shadow-2xl shadow-primary/20 relative overflow-hidden group">
-                <div className="absolute -right-4 -bottom-4 text-white/10 group-hover:rotate-12 transition-transform duration-500">
-                  <BrainCircuit className="w-24 h-24" />
+                    ) : (
+                      chatMessages.map((msg) => (
+                        <motion.div
+                          key={msg.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={cn(
+                            "p-4 rounded-[24px] border-2 leading-relaxed font-medium text-sm",
+                            msg.role === 'user'
+                              ? "bg-white border-slate-100 text-slate-800 ml-8 shadow-sm"
+                              : msg.isError
+                              ? "bg-red-50 border-red-100 text-red-800 mr-8 shadow-sm"
+                              : "bg-emerald-50 border-emerald-100 text-emerald-800 mr-8 shadow-sm"
+                          )}
+                        >
+                          <div className="flex items-start gap-3">
+                             <div className={cn(
+                               "p-1.5 rounded-lg mt-0.5 shrink-0",
+                               msg.role === 'user' 
+                                 ? "bg-slate-100" 
+                                 : msg.isError 
+                                 ? "bg-red-200" 
+                                 : "bg-emerald-200"
+                             )}>
+                               {msg.role === 'user' ? <User className="w-4 h-4" /> : <BrainCircuit className="w-4 h-4" />}
+                             </div>
+                             <div className="flex-1 overflow-hidden">
+                               <ReactMarkdown
+                                 components={{
+                                   p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
+                                   ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                                   ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                                   li: ({node, ...props}) => <li {...props} />,
+                                   strong: ({node, ...props}) => <strong className="font-bold text-slate-900" {...props} />,
+                                   h3: ({node, ...props}) => <h3 className="font-bold text-base mt-3 mb-1" {...props} />,
+                                   h4: ({node, ...props}) => <h4 className="font-bold mt-2 mb-1" {...props} />
+                                 }}
+                               >
+                                 {msg.text}
+                               </ReactMarkdown>
+                             </div>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                    {isChatting && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 rounded-[24px] border-2 bg-emerald-50 border-emerald-100 text-emerald-800 mr-8 shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-1.5 rounded-lg bg-emerald-200 shrink-0">
+                            <BrainCircuit className="w-4 h-4" />
+                          </div>
+                          <div className="flex gap-1">
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-                <h4 className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] mb-4">Как это работает?</h4>
-                <ul className="space-y-4 text-sm text-white/90 font-medium">
-                  <li className="flex gap-3">
-                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black shrink-0 shadow-inner">1</div>
-                    AI анализирует твое решение по 12 параметрам качества кода.
-                  </li>
-                  <li className="flex gap-3">
-                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black shrink-0 shadow-inner">2</div>
-                    Получаешь контекстные советы без прямого ответа.
-                  </li>
-                  <li className="flex gap-3">
-                    <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-[11px] font-black shrink-0 shadow-inner">3</div>
-                    Учишься решать задачи так, как принято в нашей команде.
-                  </li>
-                </ul>
+
+                <div className="shrink-0 pt-4 border-t border-slate-100">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="Задай вопрос ИИ-тимлидеру..."
+                      disabled={isChatting}
+                      className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-white text-sm"
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!chatInput.trim() || isChatting}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </aside>

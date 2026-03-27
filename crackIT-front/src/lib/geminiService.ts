@@ -1,25 +1,33 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+interface ChatHistoryItem {
+  role: string;
+  parts: { text: string }[];
+}
 
-const API_KEY = import.meta.env.VITE_AI_MENTOR_API_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY);
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// Используем модель gemini-2.5-flash-lite по строгому требованию пользователя
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-2.5-flash-lite",
-  systemInstruction: "Ты — профессиональный AI-тимлидер по имени Beyim в инновационной компании Beyim. Твоя цель — помогать новым сотрудникам в онбординге, отвечать на их вопросы о культуре компании, процессах и задачах. Твой тон — дружелюбный, поддерживающий и профессиональный. Используй Markdown для форматирования ответов (жирный текст, списки, заголовки).",
-});
-
-export const getGeminiResponse = async (prompt: string, history: { role: string; parts: { text: string }[] }[]) => {
+export const getGeminiResponse = async (prompt: string, history: ChatHistoryItem[]) => {
   try {
-    const chat = model.startChat({
-      history: history,
+    const response = await fetch(`${API_URL}/ai/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        prompt,
+        history
+      })
     });
 
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response;
-    return response.text();
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => null);
+      const message = errorPayload?.error || 'AI service is unavailable';
+      throw new Error(message);
+    }
+
+    const payload = await response.json();
+    return payload.response || '';
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("AI API Error:", error);
     return "Извини, произошла ошибка при получении ответа от AI-тимлидера Beyim. Пожалуйста, проверь API ключ или попробуй позже.";
   }
 };

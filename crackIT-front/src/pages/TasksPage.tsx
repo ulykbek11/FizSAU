@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BrainCircuit, FileText, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, FileText, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
 import type { Task } from '../components/AISimulator';
