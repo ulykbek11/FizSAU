@@ -20,11 +20,7 @@ app.use(express.json());
 // Swagger setup
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-// Create tmp directory if it doesn't exist
-const tmpDir = path.join(__dirname, '..', 'tmp');
-if (!fs.existsSync(tmpDir)) {
-  fs.mkdirSync(tmpDir);
-}
+// No need to create a manual tmp dir anymore
 
 // Routes
 app.use('/tasks', taskRoutes);

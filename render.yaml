@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: crackit-back
+    env: node
+    rootDir: crackIT-back
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

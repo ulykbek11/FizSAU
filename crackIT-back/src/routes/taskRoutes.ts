@@ -5,9 +5,11 @@ import path from 'path';
 
 const router = Router();
 
+import os from 'os';
+
 // Configure multer for temp storage
 const upload = multer({ 
-  dest: path.join(__dirname, '..', '..', 'tmp') 
+  dest: os.tmpdir() 
 });
 
 // Create task with starter and solution zips
