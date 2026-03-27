@@ -99,6 +99,27 @@ Code compiles successfully. The page layout correctly adapts to 3 cards and a fu
 **Outcome:**
 ✅ Success
 
+## [2026-03-27] - Fix Dashboard Task Counter and Filtering
+
+**Problem/Request:**
+The dashboard showed 0 active tasks even when tasks were available. Solved tasks were not correctly filtered out from the count and were expected to "drop off" (disappear) from the active lists.
+
+**Files Modified:**
+- `crackIT-front/src/pages/DashboardPage.tsx` (lines 212-230) - Updated `fetchTasksCount` to fetch all task IDs and filter by `solvedTasks` array.
+- `crackIT-front/src/components/AISimulator.tsx` (lines 123-150) - Added a `useEffect` to automatically remove tasks from the active list as soon as they are solved.
+
+**Solution Summary:**
+- Replaced the simple subtraction logic in the dashboard with a robust filtering logic that compares database task IDs with the user's `solvedTasks` array from `localStorage`.
+- Implemented immediate task "drop-off" in the AI Simulator so that solved tasks disappear from the current session without requiring a page refresh.
+- Ensured consistency between the dashboard counter and the actual tasks list in `TasksPage.tsx`.
+
+**Verification:**
+The dashboard now correctly calculates the number of unsolved tasks. The simulator UI automatically updates to the next task or the "no tasks" state upon successful solution.
+
+**Outcome:**
+✅ Success
+✅ Success
+
 ## [2026-03-27] - Centralize Task Creation
 
 **Problem/Request:**

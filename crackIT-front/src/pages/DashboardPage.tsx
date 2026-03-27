@@ -211,15 +211,18 @@ const DashboardPage: React.FC = () => {
   useEffect(() => {
     const fetchTasksCount = async () => {
       try {
-        const { count, error } = await supabase
+        const { data, error } = await supabase
           .from('tasks')
-          .select('*', { count: 'exact', head: true });
+          .select('id');
         
         if (error) throw error;
         
-        const progress = JSON.parse(localStorage.getItem('ai_simulator_progress') || '{"solvedCount":0}');
-        const totalTasks = count || 0;
-        const unsolved = Math.max(0, totalTasks - progress.solvedCount);
+        const progress = JSON.parse(localStorage.getItem('ai_simulator_progress') || '{"solvedCount":0, "solvedTasks": []}');
+        const solvedTaskIds = progress.solvedTasks || [];
+        
+        const unsolvedTasks = data ? data.filter(t => !solvedTaskIds.includes(t.id)) : [];
+        const unsolved = unsolvedTasks.length;
+        
         setActiveTasksCount(unsolved);
 
         // Формируем уведомления

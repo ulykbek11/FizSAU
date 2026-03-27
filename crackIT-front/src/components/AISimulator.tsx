@@ -125,7 +125,28 @@ export const AISimulator: React.FC = () => {
   // Сохранение прогресса
   useEffect(() => {
     localStorage.setItem('ai_simulator_progress', JSON.stringify(progress));
-  }, [progress]);
+    
+    // Если текущая задача была решена, она должна "отпасть" из списка активных
+    if (progress.solvedTasks && progress.solvedTasks.length > 0) {
+      setTasks(prevTasks => {
+        const activeTasks = prevTasks.filter(t => !progress.solvedTasks?.includes(t.id));
+        if (activeTasks.length !== prevTasks.length) {
+          // Если текущая задача была решена, переключаемся на следующую или обнуляем
+          if (currentTask && progress.solvedTasks?.includes(currentTask.id)) {
+            if (activeTasks.length > 0) {
+              setCurrentTask(activeTasks[0]);
+            } else {
+              setCurrentTask(null);
+            }
+            setFeedback({ type: 'none', text: '' });
+            setUserInput('');
+          }
+          return activeTasks;
+        }
+        return prevTasks;
+      });
+    }
+  }, [progress, currentTask]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
