@@ -99,6 +99,44 @@ Code compiles successfully. The page layout correctly adapts to 3 cards and a fu
 **Outcome:**
 ✅ Success
 
+## [2026-03-27] - Centralize Task Creation
+
+**Problem/Request:**
+Team Leader's custom tasks were saving to local `localStorage` only, meaning employees couldn't see the new tasks created by their Team Leader. We needed to transition from `localStorage` to Supabase.
+
+**Files Modified:**
+- `crackIT-front/src/pages/DashboardPage.tsx` - Updated `handleSave` in `UploadTaskModal` to perform a `supabase.from('tasks').insert()` instead of updating `localStorage`. Updated `fetchTasksCount` to query Supabase for the active task count.
+- `crackIT-front/src/pages/TasksPage.tsx` - Replaced `localStorage` usage with a `supabase.from('tasks').select('*')` query to dynamically load tasks and map them to the `Task` interface. Added loading states.
+- `crackIT-front/src/components/AISimulator.tsx` - Updated to fetch available tasks directly from the Supabase `tasks` table instead of `localStorage`. 
+
+**Solution Summary:**
+Migrated the entire custom task flow from local client storage to the centralized Supabase database. When a Team Leader creates a task via the UI, it's now saved to the `tasks` table with a `simulation` mode. Both the `TasksPage` and `AISimulator` components now perform asynchronous data fetching from Supabase, ensuring that all employees see the globally created tasks. 
+
+**Verification:**
+Built the project successfully (`npm run build`). Code compiles correctly without TypeScript errors.
+
+**Outcome:**
+✅ Success
+
+## [2026-03-27] - Remove Static Tasks
+
+**Problem/Request:**
+User requested to remove all static (mock) tasks so that only tasks created by the Team Leader are displayed in the "Active Tasks" and the AI Simulator.
+
+**Files Modified:**
+- `crackIT-front/src/components/AISimulator.tsx` - Emptied `MOCK_TASKS`, updated state to handle empty task list, added "No active tasks" UI placeholder.
+- `crackIT-front/src/pages/TasksPage.tsx` - Removed `MOCK_TASKS` from state initialization so it only loads custom tasks.
+- `crackIT-front/src/pages/DashboardPage.tsx` - Updated active tasks counter to not include the 2 static tasks.
+
+**Solution Summary:**
+Cleared out the hardcoded task data from the application. Adjusted the simulator component to render gracefully when no tasks are available (displaying a user-friendly message). Updated the dashboard counter to reflect only real tasks.
+
+**Verification:**
+Built the project successfully (`npm run build`). TypeScript compilation passed with no errors.
+
+**Outcome:**
+✅ Success
+
 ## [2026-03-27] - Team Leader Access to Subordinate Analytics
 
 **Problem/Request:**

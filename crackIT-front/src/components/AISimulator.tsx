@@ -20,6 +20,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import { supabase } from '../lib/supabaseClient';
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -34,33 +36,18 @@ export interface Task {
   category: string;
   taskFileName?: string;
   solutionFileName?: string;
+  isSolved?: boolean;
 }
 
 export interface UserProgress {
   solvedCount: number;
   totalAttempts: number;
   lastSolvedId?: string;
+  solvedTasks?: string[];
 }
 
 // --- Заглушки данных ---
-export const MOCK_TASKS: Task[] = [
-  {
-    id: '1',
-    title: 'Настройка окружения для нового проекта',
-    description: 'Нужно инициализировать проект с использованием Vite, React и Tailwind CSS. Какие команды нужно выполнить в терминале для установки всех зависимостей и запуска сервера разработки?',
-    solution: 'npm create vite@latest . -- --template react-ts\nnpm install -D tailwindcss postcss autoprefixer\nnpx tailwindcss init -p\nnpm run dev',
-    author: 'Алексей Иванов (Team Lead)',
-    category: 'DevOps / Setup'
-  },
-  {
-    id: '2',
-    title: 'Обработка ошибок в API-запросах',
-    description: 'Напишите базовый паттерн использования try-catch блока для fetch-запроса, который проверяет response.ok и выбрасывает ошибку с текстом из ответа, если запрос неудачен.',
-    solution: 'try {\n  const res = await fetch(url);\n  if (!res.ok) throw new Error(await res.text());\n  return await res.json();\n} catch (err) {\n  console.error(err);\n}',
-    author: 'Мария Петрова (Senior Dev)',
-    category: 'Frontend'
-  }
-];
+export const MOCK_TASKS: Task[] = [];
 
 // --- Компонент ---
 export const AISimulator: React.FC = () => {
@@ -69,30 +56,64 @@ export const AISimulator: React.FC = () => {
   const targetTaskId = searchParams.get('taskId');
   
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
-  const [currentTask, setCurrentTask] = useState<Task>(MOCK_TASKS[0]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [currentTask, setCurrentTask] = useState<Task | null>(null);
 
-  // Загрузка задач (MOCK + Custom)
+  // Загрузка задач из Supabase
   useEffect(() => {
-    const customTasks = JSON.parse(localStorage.getItem('custom_tasks') || '[]');
-    const allTasks = [...MOCK_TASKS, ...customTasks];
-    setTasks(allTasks);
-    if (allTasks.length > 0) {
-      if (targetTaskId) {
-        const found = allTasks.find(t => t.id === targetTaskId);
-        if (found) setCurrentTask(found);
-        else setCurrentTask(allTasks[0]);
-      } else {
-        setCurrentTask(allTasks[0]);
+    const fetchTasks = async () => {
+      try {
+        const { data, error } = await supabase.from('tasks').select('*');
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          const progressData = JSON.parse(localStorage.getItem('ai_simulator_progress') || '{"solvedCount":0, "solvedTasks": []}');
+          const solvedTaskIds = progressData.solvedTasks || [];
+
+          const formattedTasks: Task[] = data.map(t => ({
+            id: t.id,
+            title: t.title,
+            description: t.description || 'Без описания',
+            solution: t.evaluation_criteria?.[0]?.text || '',
+            author: 'Тимлидер',
+            category: t.mode === 'simulation' ? 'Симуляция' : 'Код',
+            isSolved: solvedTaskIds.includes(t.id)
+          }));
+          
+          // Оставляем только нерешенные задачи
+          const activeTasks = formattedTasks.filter(t => !t.isSolved);
+          
+          setTasks(activeTasks);
+          
+          if (activeTasks.length > 0) {
+            if (targetTaskId) {
+              const found = activeTasks.find((t: Task) => t.id === targetTaskId);
+              if (found) setCurrentTask(found);
+              else setCurrentTask(activeTasks[0]);
+            } else {
+              setCurrentTask(activeTasks[0]);
+            }
+          } else {
+            setCurrentTask(null);
+          }
+        } else {
+          setTasks([]);
+          setCurrentTask(null);
+        }
+      } catch (err) {
+        console.error('Ошибка загрузки задач:', err);
+        setCurrentTask(null);
       }
-    }
+    };
+
+    fetchTasks();
   }, [targetTaskId]);
 
   const [userInput, setUserInput] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'hint' | 'success' | 'none', text: string }>({ type: 'none', text: '' });
   const [isChecking, setIsChecking] = useState(false);
-  const [progress, setProgress] = useState<UserProgress>({ solvedCount: 0, totalAttempts: 0 });
+  const [progress, setProgress] = useState<UserProgress>({ solvedCount: 0, totalAttempts: 0, solvedTasks: [] });
   const [showAuthorHelp, setShowAuthorHelp] = useState(false);
 
   // Загрузка прогресса
@@ -118,7 +139,7 @@ export const AISimulator: React.FC = () => {
   };
 
   const handleCheckSolution = async () => {
-    if (!userInput.trim() && !selectedFile) return;
+    if (!currentTask || (!userInput.trim() && !selectedFile)) return;
     
     setIsChecking(true);
     
@@ -129,13 +150,13 @@ export const AISimulator: React.FC = () => {
         formData.append('userSolution', selectedFile);
         formData.append('userId', 'test-user-id');
         
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/tasks/${currentTask.id}/submit`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/tasks/${currentTask?.id}/submit`, {
           method: 'POST',
           body: formData,
         });
         
         if (!response.ok) {
-          throw new Error('Ошибка сервера при проверке решения');
+          throw new Error('Ошибка при проверке решения');
         }
         
         const data = await response.json();
@@ -145,11 +166,26 @@ export const AISimulator: React.FC = () => {
           type: evaluation.score >= 80 ? 'success' : 'hint', 
           text: `🤖 Оценка: ${evaluation.score}/100. ${evaluation.feedback}` 
         });
-        setProgress(prev => ({ 
-          ...prev, 
-          solvedCount: evaluation.score >= 80 ? prev.solvedCount + 1 : prev.solvedCount, 
-          totalAttempts: prev.totalAttempts + 1 
-        }));
+        
+        if (evaluation.score >= 80) {
+          setProgress(prev => {
+            const solvedTasks = prev.solvedTasks || [];
+            if (!solvedTasks.includes(currentTask.id)) {
+              return { 
+                ...prev, 
+                solvedCount: prev.solvedCount + 1, 
+                totalAttempts: prev.totalAttempts + 1,
+                solvedTasks: [...solvedTasks, currentTask.id]
+              };
+            }
+            return { ...prev, totalAttempts: prev.totalAttempts + 1 };
+          });
+        } else {
+          setProgress(prev => ({ 
+            ...prev, 
+            totalAttempts: prev.totalAttempts + 1 
+          }));
+        }
       } else {
         // Fallback text check (MOCK) if no file provided
         setTimeout(() => {
@@ -161,7 +197,18 @@ export const AISimulator: React.FC = () => {
               type: 'success', 
               text: 'Отлично! Твое решение совпадает с эталонным. Ты правильно уловил суть задачи.' 
             });
-            setProgress(prev => ({ ...prev, solvedCount: prev.solvedCount + 1, totalAttempts: prev.totalAttempts + 1 }));
+            setProgress(prev => {
+              const solvedTasks = prev.solvedTasks || [];
+              if (!solvedTasks.includes(currentTask.id)) {
+                return { 
+                  ...prev, 
+                  solvedCount: prev.solvedCount + 1, 
+                  totalAttempts: prev.totalAttempts + 1,
+                  solvedTasks: [...solvedTasks, currentTask.id]
+                };
+              }
+              return { ...prev, totalAttempts: prev.totalAttempts + 1 };
+            });
           } else {
             let hint = 'Хм, неплохое начало, но попробуй обратить внимание на ';
             if (!normalizedUser.includes('npm')) hint += 'использование пакетного менеджера (npm/yarn).';
@@ -184,12 +231,14 @@ export const AISimulator: React.FC = () => {
   };
 
   const handleAskAuthor = () => {
+    if (!currentTask) return;
     setShowAuthorHelp(true);
     setTimeout(() => setShowAuthorHelp(false), 3000);
     console.log(`Сообщение отправлено автору: ${currentTask.author}. Задача: ${currentTask.title}`);
   };
 
   const nextTask = () => {
+    if (tasks.length === 0 || !currentTask) return;
     const nextIndex = (tasks.indexOf(currentTask) + 1) % tasks.length;
     setCurrentTask(tasks[nextIndex]);
     setUserInput('');
@@ -242,9 +291,21 @@ export const AISimulator: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Task Section */}
           <section className="lg:col-span-7 space-y-6">
-            <motion.div 
-              key={currentTask.id}
-              initial={{ opacity: 0, y: 20 }}
+            {!currentTask ? (
+              <div className="premium-glass p-8 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40 text-center flex flex-col items-center justify-center min-h-[400px]">
+                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6 text-slate-300">
+                  <BrainCircuit className="w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 mb-3">Нет доступных задач</h2>
+                <p className="text-slate-500 font-medium text-lg max-w-sm mx-auto">
+                  Тимлидер пока не добавил ни одной задачи для решения. Загляни сюда позже!
+                </p>
+              </div>
+            ) : (
+              <>
+                <motion.div 
+                  key={currentTask.id}
+                  initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="premium-glass p-8 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40 relative overflow-hidden"
             >
@@ -384,6 +445,8 @@ export const AISimulator: React.FC = () => {
                 )}
               </AnimatePresence>
             </div>
+            </>
+            )}
           </section>
 
           {/* Feedback Section */}

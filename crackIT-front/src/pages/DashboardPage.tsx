@@ -31,28 +31,21 @@ const UploadTaskModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ i
   const taskFileRef = React.useRef<HTMLInputElement>(null);
   const solutionFileRef = React.useRef<HTMLInputElement>(null);
 
-  const handleSave = () => {
-    if (!title || !category || (!description && !taskFile) || (!solution && !solutionFile)) return;
+  const handleSave = async () => {
+    if (!title || (!description && !taskFile) || (!solution && !solutionFile)) return;
     setIsSaving(true);
     
-    const newTask = {
-      id: window.crypto.randomUUID(),
-      title,
-      category,
-      description,
-      solution,
-      taskFileName: taskFile?.name,
-      solutionFileName: solutionFile?.name,
-      author: 'Тимлидер',
-      createdAt: new Date().toISOString()
-    };
+    try {
+      // Сохраняем задачу в Supabase
+      const { error } = await supabase.from('tasks').insert([{
+        title,
+        description: description || category || 'Без описания', // Используем category как fallback, если описание пустое, так как в БД нет поля category
+        mode: 'simulation',
+        evaluation_criteria: JSON.stringify([{ text: solution || 'Оценивать по смыслу' }])
+      }]);
 
-    const existingTasks = JSON.parse(localStorage.getItem('custom_tasks') || '[]');
-    localStorage.setItem('custom_tasks', JSON.stringify([...existingTasks, newTask]));
+      if (error) throw error;
 
-    setTimeout(() => {
-      setIsSaving(false);
-      onClose();
       // Очистка полей
       setTitle('');
       setCategory('');
@@ -60,7 +53,15 @@ const UploadTaskModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ i
       setSolution('');
       setTaskFile(null);
       setSolutionFile(null);
-    }, 1000);
+      onClose();
+      // Вызываем событие или перезагружаем страницу, чтобы обновить счетчик
+      window.location.reload();
+    } catch (err) {
+      console.error('Ошибка при сохранении задачи:', err);
+      alert('Ошибка при сохранении задачи');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -208,28 +209,39 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Подсчет активных задач и уведомлений
-    const customTasks = JSON.parse(localStorage.getItem('custom_tasks') || '[]');
-    const progress = JSON.parse(localStorage.getItem('ai_simulator_progress') || '{"solvedCount":0}');
-    // Считаем нерешенные задачи (моковые + от тимлида)
-    const totalTasks = 2 + customTasks.length; 
-    const unsolved = Math.max(0, totalTasks - progress.solvedCount);
-    setActiveTasksCount(unsolved);
+    const fetchTasksCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('tasks')
+          .select('*', { count: 'exact', head: true });
+        
+        if (error) throw error;
+        
+        const progress = JSON.parse(localStorage.getItem('ai_simulator_progress') || '{"solvedCount":0}');
+        const totalTasks = count || 0;
+        const unsolved = Math.max(0, totalTasks - progress.solvedCount);
+        setActiveTasksCount(unsolved);
 
-    // Формируем уведомления
-    const notifs = [
-      { id: 'welcome', title: 'Добро пожаловать!', text: 'Система Beyim готова к работе.', time: 'Только что', unread: true }
-    ];
-    if (customTasks.length > 0) {
-      notifs.unshift({ 
-        id: 'new_tasks', 
-        title: 'Новые задачи', 
-        text: `Тимлидер добавил ${customTasks.length} новых задач(и) для решения.`, 
-        time: 'Недавно', 
-        unread: true 
-      });
-    }
-    setNotifications(notifs);
+        // Формируем уведомления
+        const notifs = [
+          { id: 'welcome', title: 'Добро пожаловать!', text: 'Система Beyim готова к работе.', time: 'Только что', unread: true }
+        ];
+        if (unsolved > 0) {
+          notifs.unshift({ 
+            id: 'new_tasks', 
+            title: 'Новые задачи', 
+            text: `У вас ${unsolved} нерешенных задач(и).`, 
+            time: 'Недавно', 
+            unread: true 
+          });
+        }
+        setNotifications(notifs);
+      } catch (err) {
+        console.error('Ошибка при загрузке задач:', err);
+      }
+    };
+
+    fetchTasksCount();
   }, []);
 
   useEffect(() => {
@@ -456,32 +468,19 @@ const DashboardPage: React.FC = () => {
                             <div className="px-2 py-0.5 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase">Team Lead Tool</div>
                             <div className="text-slate-400 text-[11px] font-bold">Загрузить новый кейс</div>
                          </>
-                      ) : (
+                      ) : activeTasksCount === 0 ? (
                          <>
                             <div className="px-2 py-0.5 bg-green-100 text-green-700 rounded-lg text-[10px] font-black uppercase">Completed</div>
-                            <div className="text-slate-400 text-[11px] font-bold">100% успеваемость</div>
+                            <div className="text-slate-400 text-[11px] font-bold">Все задачи решены</div>
+                         </>
+                      ) : (
+                         <>
+                            <div className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-lg text-[10px] font-black uppercase">In Progress</div>
+                            <div className="text-slate-400 text-[11px] font-bold">Есть нерешенные задачи</div>
                          </>
                       )}
                    </div>
                 </motion.button>
-                
-                {!isTeamLeader && (
-                  <motion.div 
-                     whileHover={{ y: -5, scale: 1.01 }}
-                     className="premium-glass p-6 rounded-[32px] border border-white/60 bg-white/40 shadow-xl shadow-slate-200/40 relative overflow-hidden text-left w-full flex-1"
-                  >
-                     <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-primary/5 rounded-full" />
-                     <div className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
-                        Твой уровень
-                     </div>
-                     <div className="text-4xl font-black text-slate-900 tracking-tighter flex items-baseline gap-2">
-                        1 <span className="text-sm font-bold text-slate-400 tracking-normal">Level</span>
-                     </div>
-                     <div className="mt-4 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full w-1/4"></div>
-                     </div>
-                  </motion.div>
-                )}
              </div>
 
              {/* Секция основных действий */}
