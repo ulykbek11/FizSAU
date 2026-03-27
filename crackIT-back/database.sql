@@ -43,14 +43,25 @@ CREATE TABLE IF NOT EXISTS public.submissions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Messages Table for Chat
+CREATE TABLE IF NOT EXISTS public.messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    sender_id UUID NOT NULL,
+    receiver_id UUID NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.team_leaders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 -- Create policies to allow all access (since this is an MVP without complex auth)
 CREATE POLICY "Allow all operations for tasks" ON public.tasks FOR ALL USING (true);
 CREATE POLICY "Allow all operations for submissions" ON public.submissions FOR ALL USING (true);
 CREATE POLICY "Allow all operations for team_leaders" ON public.team_leaders FOR ALL USING (true);
 CREATE POLICY "Allow all operations for employees" ON public.employees FOR ALL USING (true);
+CREATE POLICY "Allow all operations for messages" ON public.messages FOR ALL USING (true);
