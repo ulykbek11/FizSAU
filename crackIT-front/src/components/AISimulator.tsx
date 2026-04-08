@@ -26,7 +26,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// --- Интерфейсы ---
 export interface Task {
   id: string;
   title: string;
@@ -46,9 +45,6 @@ export interface UserProgress {
   solvedTasks?: string[];
 }
 
-
-
-// --- Компонент ---
 export const AISimulator: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -58,7 +54,6 @@ export const AISimulator: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
 
-  // Загрузка задач из Supabase
   useEffect(() => {
     const fetchTasks = async () => {
       try {
@@ -79,7 +74,6 @@ export const AISimulator: React.FC = () => {
             isSolved: solvedTaskIds.includes(t.id)
           }));
 
-          // Оставляем только нерешенные задачи
           const activeTasks = formattedTasks.filter(t => !t.isSolved);
 
           setTasks(activeTasks);
@@ -115,7 +109,6 @@ export const AISimulator: React.FC = () => {
   const [isChatting, setIsChatting] = useState(false);
   const chatContainerRef = React.useRef<HTMLDivElement>(null);
 
-  // Auto-scroll chat to bottom
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -128,7 +121,6 @@ export const AISimulator: React.FC = () => {
   });
   const [showAuthorHelp, setShowAuthorHelp] = useState(false);
 
-  // Сохранение прогресса
   useEffect(() => {
     localStorage.setItem('ai_simulator_progress', JSON.stringify(progress));
   }, [progress]);
@@ -137,7 +129,7 @@ export const AISimulator: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      // Если файл загружен, можно добавить текст-заглушку в поле ввода
+
       if (!userInput.trim()) {
         setUserInput(`[Файл прикреплен: ${file.name}]\n\nЯ прикрепил документ с решением.`);
       }
@@ -150,7 +142,7 @@ export const AISimulator: React.FC = () => {
     setIsChecking(true);
 
     try {
-      // Всегда считаем ответ правильным для прогресса
+
       setProgress(prev => {
         const solvedTasks = prev.solvedTasks || [];
         if (!solvedTasks.includes(currentTask.id)) {
@@ -164,7 +156,6 @@ export const AISimulator: React.FC = () => {
         return { ...prev, totalAttempts: prev.totalAttempts + 1 };
       });
 
-      // Получаем фидбэк от ИИ через geminiService
       const { getGeminiResponse } = await import('../lib/geminiService');
 
       const userText = userInput || (selectedFile ? `[Файл прикреплен: ${selectedFile.name}]` : 'Нет ответа');
@@ -224,13 +215,11 @@ ${userText}
     try {
       const { getGeminiResponse } = await import('../lib/geminiService');
 
-      // Формируем историю чата для Gemini
       const history = chatMessages.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.text }]
       }));
 
-      // Добавляем контекст текущей задачи в промпт, чтобы ИИ понимал о чем речь
       const contextPrefix = `Контекст: Мы обсуждаем задачу "${currentTask.title}". Описание: "${currentTask.description}".\nЭталонное решение: "${currentTask.solution}".\n\nВопрос пользователя: `;
 
       const aiResponse = await getGeminiResponse(contextPrefix + messageText, history);
@@ -267,7 +256,6 @@ ${userText}
     }
     if (!currentTask) return;
 
-    // If the current task was just removed (solved), indexOf is -1, so nextIndex is 0
     const currentIndex = tasks.findIndex(t => t.id === currentTask.id);
     const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % tasks.length;
 
@@ -280,7 +268,7 @@ ${userText}
   return (
     <div className="min-h-screen bg-[#F4F6FB] pt-8 pb-16">
       <div className="max-w-5xl mx-auto px-6 space-y-8">
-        {/* Navigation */}
+        {}
         <button
           onClick={() => navigate('/dashboard')}
           className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors font-bold text-sm group"
@@ -291,7 +279,7 @@ ${userText}
           Вернуться в дашборд
         </button>
 
-        {/* Header & Stats */}
+        {}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3 tracking-tight">
@@ -321,7 +309,7 @@ ${userText}
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Task Section */}
+          {}
           <section className="lg:col-span-7 space-y-6">
             {!currentTask ? (
               <div className="premium-glass p-8 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40 text-center flex flex-col items-center justify-center min-h-[400px]">
@@ -481,7 +469,7 @@ ${userText}
             )}
           </section>
 
-          {/* Feedback Section */}
+          {}
           <aside className="lg:col-span-5">
             <div className="sticky top-8 space-y-6">
               <div className="premium-glass p-6 rounded-[32px] border-white/80 bg-white/60 shadow-2xl shadow-slate-200/40 flex flex-col h-[700px]">
@@ -607,3 +595,4 @@ ${userText}
 };
 
 export default AISimulator;
+

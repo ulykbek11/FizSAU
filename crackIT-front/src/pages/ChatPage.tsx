@@ -32,18 +32,17 @@ const ChatPage: React.FC = () => {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [role, setRole] = useState<'employee' | 'teamleader' | null>(null);
-  
+
   const [contacts, setContacts] = useState<UserContact[]>([]);
   const [currentContact, setCurrentContact] = useState<UserContact | null>(null);
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Initial load
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -55,21 +54,20 @@ const ChatPage: React.FC = () => {
       const userRole = user.user_metadata?.role;
       setRole(userRole);
 
-      // Fetch contacts
       if (userRole === 'employee') {
         const { data: empData } = await supabase
           .from('employees')
           .select('team_leader_id')
           .eq('id', user.id)
           .single();
-          
+
         if (empData?.team_leader_id) {
           const { data: tlData } = await supabase
             .from('team_leaders')
             .select('*')
             .eq('id', empData.team_leader_id)
             .single();
-            
+
           if (tlData) {
             setContacts([tlData]);
             setCurrentContact(tlData);
@@ -80,7 +78,7 @@ const ChatPage: React.FC = () => {
           .from('employees')
           .select('*')
           .eq('team_leader_id', user.id);
-          
+
         if (empData && empData.length > 0) {
           setContacts(empData);
           if (initialUserId) {
@@ -97,7 +95,6 @@ const ChatPage: React.FC = () => {
     init();
   }, [navigate, initialUserId]);
 
-  // Messages fetch and realtime subscription
   useEffect(() => {
     if (!currentUser || !currentContact) return;
 
@@ -107,13 +104,12 @@ const ChatPage: React.FC = () => {
         .select('*')
         .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${currentContact.id}),and(sender_id.eq.${currentContact.id},receiver_id.eq.${currentUser.id})`)
         .order('created_at', { ascending: true });
-        
+
       if (data) setMessages(data);
     };
 
     fetchMessages();
 
-    // Fallback polling every 3 seconds in case Supabase Realtime is not enabled for the table
     const interval = setInterval(fetchMessages, 3000);
 
     const channel = supabase
@@ -151,8 +147,7 @@ const ChatPage: React.FC = () => {
 
     const msgText = inputValue;
     setInputValue('');
-    
-    // Optimistic update
+
     const tempMessage: Message = {
       id: crypto.randomUUID(),
       sender_id: currentUser.id,
@@ -160,7 +155,7 @@ const ChatPage: React.FC = () => {
       content: msgText,
       created_at: new Date().toISOString()
     };
-    
+
     setMessages(prev => [...prev, tempMessage]);
 
     const { error } = await supabase
@@ -173,7 +168,7 @@ const ChatPage: React.FC = () => {
 
     if (error) {
       console.error("Error sending message:", error);
-      // Fallback: reload messages if error or just rely on the next poll
+
     }
   };
 
@@ -189,7 +184,7 @@ const ChatPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans flex overflow-hidden">
-      {/* Sidebar */}
+      {}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
           <motion.aside
@@ -255,7 +250,7 @@ const ChatPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Main Content */}
+      {}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
         {!isSidebarOpen && (
           <button 
@@ -266,7 +261,7 @@ const ChatPage: React.FC = () => {
           </button>
         )}
 
-        {/* Header */}
+        {}
         <nav className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-6 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-4">
             {isSidebarOpen ? null : <div className="w-10" />}
@@ -289,7 +284,7 @@ const ChatPage: React.FC = () => {
           </div>
         </nav>
 
-        {/* Chat Messages */}
+        {}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-slate-50/50">
           {messages.map((message) => {
             const isMe = message.sender_id === currentUser?.id;
@@ -306,7 +301,7 @@ const ChatPage: React.FC = () => {
                   }`}>
                     {isMe ? currentUser.user_metadata?.first_name?.charAt(0) || '?' : currentContact?.first_name.charAt(0) || '?'}
                   </div>
-                  
+
                   <div className={`px-5 py-3.5 rounded-[24px] shadow-sm relative ${
                     isMe 
                       ? 'bg-primary text-white rounded-br-sm' 
@@ -324,7 +319,7 @@ const ChatPage: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
+        {}
         <div className="p-4 bg-white border-t border-slate-200/60 shrink-0">
           <div className="max-w-4xl mx-auto relative flex items-end gap-2">
             <div className="flex-1 relative">
@@ -338,7 +333,7 @@ const ChatPage: React.FC = () => {
                 className="w-full bg-slate-100 border-none rounded-2xl py-4 pl-4 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-slate-400 disabled:opacity-50"
               />
             </div>
-            
+
             <button
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || !currentContact}

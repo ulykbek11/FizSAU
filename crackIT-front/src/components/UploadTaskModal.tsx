@@ -66,7 +66,7 @@ export const UploadTaskModal: React.FC<{ isOpen: boolean; onClose: () => void; o
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
                         className="relative w-full max-w-xl bg-white rounded-[32px] shadow-2xl border border-white/20 overflow-hidden flex flex-col max-h-[90vh]"
                     >
-                        {/* Header - Fixed */}
+                        {}
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
                             <div className="space-y-0.5">
                                 <h2 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">Новое задание</h2>
@@ -80,7 +80,7 @@ export const UploadTaskModal: React.FC<{ isOpen: boolean; onClose: () => void; o
                             </button>
                         </div>
 
-                        {/* Content - Scrollable */}
+                        {}
                         <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
@@ -160,7 +160,7 @@ export const UploadTaskModal: React.FC<{ isOpen: boolean; onClose: () => void; o
                             </div>
                         </div>
 
-                        {/* Footer - Fixed */}
+                        {}
                         <div className="p-6 bg-slate-50 border-t border-slate-100 shrink-0">
                             <button
                                 onClick={handleSave}
@@ -183,3 +183,4 @@ export const UploadTaskModal: React.FC<{ isOpen: boolean; onClose: () => void; o
         </AnimatePresence>
     );
 };
+

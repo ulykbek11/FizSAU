@@ -13,16 +13,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Swagger setup
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-// No need to create a manual tmp dir anymore
-
-// Routes
 app.use('/tasks', taskRoutes);
 app.post('/ai/chat', async (req, res) => {
   try {
@@ -40,12 +35,10 @@ app.post('/ai/chat', async (req, res) => {
   }
 });
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running' });
 });
 
-// Root route redirects to swagger
 app.get('/', (req, res) => {
   res.redirect('/api-docs');
 });
@@ -57,5 +50,4 @@ const server = app.listen(PORT, () => {
 
 server.on('error', (e) => console.error('Server Error:', e));
 server.on('close', () => console.log('Server closed'));
-
 

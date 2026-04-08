@@ -12,7 +12,7 @@ import './App.css';
 
 const AnimatedRoutes = () => {
   const location = useLocation();
-  
+
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
@@ -81,3 +81,4 @@ function App() {
 }
 
 export default App;
+

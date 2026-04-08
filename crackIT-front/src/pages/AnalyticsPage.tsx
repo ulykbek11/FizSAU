@@ -23,7 +23,7 @@ const AnalyticsPage: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
-    // Подсчет уведомлений
+
     const customTasks = JSON.parse(localStorage.getItem('custom_tasks') || '[]');
     const notifs = [
       { id: 'welcome', title: 'Добро пожаловать!', text: 'Система Beyim готова к работе.', time: 'Только что', unread: true }
@@ -56,7 +56,7 @@ const AnalyticsPage: React.FC = () => {
             .select('first_name, last_name')
             .eq('id', targetUserId)
             .single();
-          
+
           if (empData) {
             setViewedEmployee({ firstName: empData.first_name, lastName: empData.last_name });
           }
@@ -65,7 +65,7 @@ const AnalyticsPage: React.FC = () => {
             .from('submissions')
             .select('score')
             .eq('user_id', targetUserId);
-          
+
           if (submissions && submissions.length > 0) {
             const solved = submissions.filter(s => s.score && s.score >= 80).length;
             setProgress({ solvedCount: solved, totalAttempts: submissions.length });
@@ -100,7 +100,7 @@ const AnalyticsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-primary/10">
-      {/* Navigation */}
+      {}
       <nav className="fixed top-0 left-0 right-0 h-20 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 z-40 px-6 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
            <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/10 shadow-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer" onClick={() => navigate('/dashboard')}>
@@ -108,7 +108,7 @@ const AnalyticsPage: React.FC = () => {
            </div>
            <span className="font-extrabold text-2xl tracking-tight text-slate-800">Beyim</span>
         </div>
-        
+
         <div className="flex items-center gap-6">
            <div className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/40">
               <button 
@@ -123,7 +123,7 @@ const AnalyticsPage: React.FC = () => {
            </div>
 
            <div className="h-10 w-[1px] bg-slate-200/60 hidden sm:block"></div>
-           
+
            <div className="flex items-center gap-4">
               <div className="relative">
                 <button 
@@ -135,8 +135,8 @@ const AnalyticsPage: React.FC = () => {
                     <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-primary rounded-full border-2 border-white ring-2 ring-primary/20 animate-pulse"></span>
                   )}
                 </button>
-                
-                {/* Notifications Dropdown */}
+
+                {}
                 <AnimatePresence>
                   {showNotifications && (
                     <motion.div 
@@ -180,7 +180,7 @@ const AnalyticsPage: React.FC = () => {
                   )}
                 </AnimatePresence>
               </div>
-              
+
               <div className="flex items-center gap-3.5 pl-2 group cursor-pointer">
                  <div className="text-right hidden sm:block">
                     <div className="text-sm font-extrabold leading-none text-slate-800 transition-colors group-hover:text-primary">{fullName}</div>
@@ -225,7 +225,7 @@ const AnalyticsPage: React.FC = () => {
             </p>
           </header>
 
-          {/* KPI Cards */}
+          {}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { label: 'Активные часы', value: `${(progress.totalAttempts * 0.25).toFixed(1)}ч`, icon: Activity, color: 'text-orange-500', bg: 'bg-orange-50' },
@@ -252,7 +252,7 @@ const AnalyticsPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Charts Placeholder */}
+          {}
           <div className="grid grid-cols-1 gap-8">
             <div className="premium-glass p-8 rounded-[40px] border border-white bg-white/50 shadow-sm min-h-[400px]">
               <div className="flex items-center justify-between mb-8">
@@ -289,3 +289,4 @@ const AnalyticsPage: React.FC = () => {
 };
 
 export default AnalyticsPage;
+

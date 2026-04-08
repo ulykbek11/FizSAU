@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config(); 
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const evaluationModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -61,7 +61,6 @@ ${params.userDiff}
       const result = await evaluationModel.generateContent(prompt);
       const responseText = result.response.text();
 
-      // Clean up markdown code block if present
       const jsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
 
       return JSON.parse(jsonStr);
@@ -90,3 +89,4 @@ ${params.userDiff}
     }
   }
 }
+

@@ -33,7 +33,7 @@ const LoginPage: React.FC = () => {
       });
 
       if (error) throw error;
-      
+
       if (data.user) {
         navigate('/dashboard');
       }
@@ -46,7 +46,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden relative">
-      {/* Decorative Elements */}
+      {}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/10 rounded-full blur-[120px]" />
 
@@ -56,7 +56,7 @@ const LoginPage: React.FC = () => {
         transition={{ duration: 0.5 }}
         className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10"
       >
-        {/* Left Side: Illustration / Info */}
+        {}
         <div className="hidden lg:block space-y-8 pr-12">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
@@ -88,7 +88,7 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: Login Form */}
+        {}
         <div className="premium-glass p-8 sm:p-10 rounded-[32px] w-full border border-white/50 backdrop-blur-xl bg-white/80 shadow-2xl">
           <div className="flex flex-col gap-8">
             <div className="space-y-2">
@@ -96,7 +96,7 @@ const LoginPage: React.FC = () => {
               <p className="text-slate-500">Введите свои данные для продолжения</p>
             </div>
 
-            {/* Role Switcher (Keeping consistency with Register) */}
+            {}
             <div className="flex p-1 bg-slate-100/80 rounded-2xl">
               <button
                 type="button"
@@ -233,3 +233,4 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
+

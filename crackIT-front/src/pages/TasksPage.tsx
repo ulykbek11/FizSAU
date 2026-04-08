@@ -67,7 +67,7 @@ const TasksPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F4F6FB] pt-8 pb-16">
       <div className="max-w-5xl mx-auto px-6 space-y-8">
-        {/* Navigation */}
+        {}
         <button
           onClick={() => navigate('/dashboard')}
           className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors font-bold text-sm group w-fit"
@@ -78,7 +78,7 @@ const TasksPage: React.FC = () => {
           Вернуться в дашборд
         </button>
 
-        {/* Header */}
+        {}
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-3 tracking-tight">
@@ -181,3 +181,4 @@ const TasksPage: React.FC = () => {
 };
 
 export default TasksPage;
+

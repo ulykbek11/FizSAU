@@ -16,3 +16,20 @@
 
 **Outcome:**
 ✅ Success
+## [2026-04-08 21:37] - Remove comments and create README
+
+**Problem/Request:**
+User requested to remove all comments from source files and add a full project description in English in a README file.
+
+**Files Modified:**
+- README.md (created) - Added full project documentation
+- Multiple .ts, .tsx, .js files across frontend and backend (lines vary) - Removed single-line and multi-line comments
+
+**Solution Summary:**
+Used a PowerShell script to recursively remove // and /* */ comments from all JS/TS files while ignoring node_modules and build directories. Created a comprehensive README.md in the root directory detailing the crackIT project structure, features, tech stack, and setup instructions.
+
+**Verification:**
+Verified README creation and inspected files like index.ts and aiService.ts to ensure comments were stripped without breaking code structure.
+
+**Outcome:**
+? Success

@@ -35,20 +35,18 @@ const CompleteProfilePage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    
+
     setLoading(true);
     setError(null);
 
     try {
       const generatedInviteCode = role === 'teamleader' ? `FD-${Math.random().toString(36).substring(2, 8).toUpperCase()}` : undefined;
-      
-      // Имя и фамилия из Google, если есть
+
       const fullName = user.user_metadata?.full_name || '';
       const nameParts = fullName.split(' ');
       const firstName = user.user_metadata?.first_name || nameParts[0] || '';
       const lastName = user.user_metadata?.last_name || nameParts.slice(1).join(' ') || '';
 
-      // Обновляем метаданные пользователя
       const { error: updateError } = await supabase.auth.updateUser({
         data: {
           role: role,

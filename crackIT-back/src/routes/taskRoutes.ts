@@ -7,21 +7,18 @@ const router = Router();
 
 import os from 'os';
 
-// Configure multer for temp storage
 const upload = multer({ 
   dest: os.tmpdir() 
 });
 
-// Create task with starter and solution zips
 router.post('/', upload.fields([
   { name: 'starter', maxCount: 1 },
   { name: 'solution', maxCount: 1 }
 ]), createTask);
 
-// Get a task
 router.get('/:id', getTask);
 
-// Submit user solution zip
 router.post('/:id/submit', upload.single('userSolution'), submitSolution);
 
 export default router;
+

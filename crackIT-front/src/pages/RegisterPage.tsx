@@ -54,8 +54,7 @@ const RegisterPage: React.FC = () => {
             role: role,
             first_name: firstName,
             last_name: lastName,
-            // Для совместимости со старыми триггерами (если они есть),
-            // мы можем передать company_name, даже если это teamleader.
+
             company_name: companyName,
             invite_code: role === 'employee' ? inviteCode : generatedInviteCode,
           }
@@ -63,9 +62,9 @@ const RegisterPage: React.FC = () => {
       });
 
       if (error) throw error;
-      
+
       if (data.user) {
-        // Если это тимлидер, записываем его в отдельную таблицу
+
         if (role === 'teamleader') {
           try {
             const { error: insertError } = await supabase
@@ -81,7 +80,7 @@ const RegisterPage: React.FC = () => {
 
             if (insertError) {
               console.error("DEBUG: Ошибка вставки в team_leaders:", insertError);
-              // Если вставка не удалась, НЕ ПРЕРЫВАЕМ регистрацию, а просто предупреждаем
+
               alert(`Внимание: аккаунт создан, но возникла ошибка при записи в профиль: ${insertError.message}`);
             }
           } catch (tableErr) {
@@ -89,7 +88,7 @@ const RegisterPage: React.FC = () => {
           }
         } else if (role === 'employee') {
           try {
-            // Найдем team leader по инвайт коду
+
             const { data: teamLeaderData } = await supabase
               .from('team_leaders')
               .select('id')
@@ -137,7 +136,7 @@ const RegisterPage: React.FC = () => {
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10"
       >
-        {/* Left Side: Info & Branding */}
+        {}
         <div className="hidden lg:block space-y-8 pr-12">
           <div className="flex items-center gap-3 cursor-default">
             <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
@@ -181,7 +180,7 @@ const RegisterPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: Form */}
+        {}
         <div className="premium-glass p-8 sm:p-10 rounded-[40px] w-full border border-white/60 backdrop-blur-3xl bg-white/70 shadow-2xl flex flex-col gap-8 transition-all hover:bg-white/80">
           <div className="space-y-2">
             <h3 className="text-3xl font-bold text-slate-900 tracking-tight">Создать аккаунт</h3>
@@ -396,3 +395,4 @@ const RegisterPage: React.FC = () => {
 };
 
 export default RegisterPage;
+

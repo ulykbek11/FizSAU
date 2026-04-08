@@ -13,7 +13,7 @@ async function checkDatabase() {
   try {
     const { error: taskError } = await supabase.from('tasks').select('id').limit(1);
     const { error: msgError } = await supabase.from('messages').select('id').limit(1);
-    
+
     if (taskError || msgError) {
       console.error('❌ Ошибка подключения или необходимые таблицы ("tasks", "messages") не существуют:');
       console.error(taskError?.message || msgError?.message);
@@ -30,3 +30,4 @@ async function checkDatabase() {
 }
 
 checkDatabase();
+

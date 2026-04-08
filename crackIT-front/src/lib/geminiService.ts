@@ -30,3 +30,4 @@ export const getGeminiResponse = async (prompt: string, history: ChatHistoryItem
     return "Извини, произошла ошибка при получении ответа от AI-тимлидера Beyim. Попробуй ещё раз.";
   }
 };
+

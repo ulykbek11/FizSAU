@@ -44,7 +44,6 @@ const DashboardPage: React.FC = () => {
 
         setActiveTasksCount(unsolved);
 
-        // Формируем уведомления
         const notifs = [
           { id: 'welcome', title: 'Добро пожаловать!', text: 'Система Beyim готова к работе.', time: 'Только что', unread: true }
         ];
@@ -74,7 +73,7 @@ const DashboardPage: React.FC = () => {
           console.error("Auth error or no user found:", error);
           navigate('/login');
         } else {
-          // Если пользователь вошел через Google и у него нет роли
+
           if (!user.user_metadata?.role) {
             navigate('/complete-profile');
             return;
@@ -124,7 +123,7 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-primary/10">
       <UploadTaskModal isOpen={isUploadModalOpen} onClose={() => setIsUploadModalOpen(false)} />
-      {/* Sidebar (Desktop) / Navbar (Mobile) */}
+      {}
       <nav className="fixed top-0 left-0 right-0 h-20 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 z-40 px-6 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/10 shadow-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer">
@@ -160,7 +159,7 @@ const DashboardPage: React.FC = () => {
                 )}
               </button>
 
-              {/* Notifications Dropdown */}
+              {}
               <AnimatePresence>
                 {showNotifications && (
                   <motion.div
@@ -265,7 +264,7 @@ const DashboardPage: React.FC = () => {
           </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Секция статистики */}
+            {}
             <div className="lg:col-span-4 flex flex-col gap-4 h-full min-h-[320px]">
               <motion.button
                 whileHover={{ y: -5, scale: 1.01 }}
@@ -305,7 +304,7 @@ const DashboardPage: React.FC = () => {
               </motion.button>
             </div>
 
-            {/* Секция основных действий */}
+            {}
             {!isTeamLeader && (
               <div className="lg:col-span-4 h-full min-h-[320px]">
                 <motion.button
@@ -349,7 +348,7 @@ const DashboardPage: React.FC = () => {
               </div>
             )}
 
-            {/* Секция чата */}
+            {}
             <div className="lg:col-span-4 h-full min-h-[320px]">
               <motion.button
                 whileHover={{ y: -8, scale: 1.02 }}
@@ -461,3 +460,4 @@ const DashboardPage: React.FC = () => {
 };
 
 export default DashboardPage;
+

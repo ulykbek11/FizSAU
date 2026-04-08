@@ -17,24 +17,20 @@ export const createTask = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    // Unzip files
     const starterPath = await FileService.unzipFile(starterFile.path, 'starter');
     const solutionPath = await FileService.unzipFile(solutionFile.path, 'solution');
 
-    // Compute diff
     const solutionDiff = await DiffService.computeDiff(starterPath, solutionPath);
 
-    // Save task
     const taskId = await TaskService.createTask({
       title: title || 'New Task',
       description: description || '',
       mode: 'simulation',
-      starter_path: starterPath, // Saving local path for MVP
+      starter_path: starterPath, 
       solution_diff: solutionDiff,
       evaluation_criteria: evaluationCriteria ? JSON.parse(evaluationCriteria) : []
     });
 
-    // Cleanup ONLY solution path, keep starter path for later comparisons
     FileService.cleanup(solutionPath);
 
     res.status(201).json({ taskId, message: 'Task created successfully' });
@@ -69,22 +65,8 @@ export const submitSolution = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Get task to retrieve starter (For MVP, we might need to store the starter zip or re-upload it. 
-    // Wait, the architecture says: "load starter. compute diff(starter, user)". 
-    // To simplify MVP, let's assume the user sends the full project and we compare it against a known starter,
-    // OR we just assume the frontend sends the user solution, and we need the starter.
-    // Actually, storing the starter zip in FileService/Storage is required.
-    // For MVP, let's assume we save the starter zip locally or in Supabase Storage.
-    // Let's implement a simplified version where the starter zip is saved locally for now, 
-    // or we just compare the userDiff if we can't easily get the starter.
-    // Actually, to make it work right now, let's just create a dummy diff or implement it properly.
-    
-    // Unzip user solution
     const userPath = await FileService.unzipFile(userFile.path, 'user');
-    
-    // In a real scenario, we fetch the starter zip from storage and unzip it.
-    // For now, let's assume we have it or we just use a mocked diff if starter is missing.
-    // Let's implement it properly by storing the starter zip path in the DB.
+
     const task = await TaskService.getTask(taskId);
     if (!task) {
       res.status(404).json({ error: 'Task not found' });
@@ -98,7 +80,6 @@ export const submitSolution = async (req: Request, res: Response): Promise<void>
       userDiff = "Mocked diff because starter path is missing";
     }
 
-    // Evaluate using AI
     const evaluation = await AIService.generateEvaluation({
       description: task.description,
       solutionDiff: task.solution_diff,
@@ -106,7 +87,6 @@ export const submitSolution = async (req: Request, res: Response): Promise<void>
       evaluationCriteria: task.evaluation_criteria
     });
 
-    // Save submission
     const submissionId = await SubmissionService.createSubmission({
       taskId,
       userId: userId || 'anonymous',
@@ -115,7 +95,6 @@ export const submitSolution = async (req: Request, res: Response): Promise<void>
       feedback: JSON.stringify(evaluation)
     });
 
-    // Cleanup
     FileService.cleanup(userPath);
 
     res.json({ submissionId, evaluation });
@@ -124,3 +103,4 @@ export const submitSolution = async (req: Request, res: Response): Promise<void>
     res.status(500).json({ error: error.message });
   }
 };
+
